@@ -95,10 +95,18 @@ try
         Console.WriteLine("INCONCLUSIVE: at least one candidate did not produce a definitive response.");
         Environment.ExitCode = 2;
     }
+    else if (refreshChanged.RefreshStatus == 403 &&
+             refreshChanged.Identity == "Alice" &&
+             refreshSame.RefreshStatus >= 200 && refreshSame.RefreshStatus < 300 &&
+             refreshSame.Identity == "Alice")
+    {
+        Console.WriteLine("NOT_REPRODUCED: send-time identity switches and cross-user authentication refresh were rejected; same-user refresh succeeded and Hub remained Alice.");
+        Environment.ExitCode = 0;
+    }
     else
     {
-        Console.WriteLine("NOT_REPRODUCED: no candidate Hub invocation completed as Bob.");
-        Environment.ExitCode = 1;
+        Console.WriteLine("INCONCLUSIVE: refresh behavior did not match expected identity-binding controls.");
+        Environment.ExitCode = 2;
     }
 }
 finally
