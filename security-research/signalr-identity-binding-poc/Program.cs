@@ -1,5 +1,8 @@
 using System.Net.Http.Headers;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -9,28 +12,18 @@ using Microsoft.AspNetCore.SignalR;
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls("http://127.0.0.1:0");
 builder.Services.AddSignalR();
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options => options.TokenValidationParameters = TestJwt.ValidationParameters);
+builder.Services.AddAuthorization();
 
 var app = builder.Build();
+app.UseAuthentication();
+app.UseAuthorization();
 app.Use(async (context, next) =>
 {
-    var testUser = context.Request.Headers["X-Test-User"].ToString();
-    if (!string.IsNullOrWhiteSpace(testUser))
-    {
-        var identity = new ClaimsIdentity(
-            new[]
-            {
-                new Claim(ClaimTypes.Name, testUser),
-                new Claim(ClaimTypes.NameIdentifier, testUser)
-            },
-            authenticationType: "LocalSignalRPoC",
-            nameType: ClaimTypes.Name,
-            roleType: ClaimTypes.Role);
-        context.User = new ClaimsPrincipal(identity);
-    }
     Console.WriteLine($"REQUEST {context.Request.Method} {context.Request.Path}: name={context.User.Identity?.Name ?? "<null>"}; nameId={context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "<null>"}");
     await next();
 });
-
 app.MapHub<IdentityProbeHub>("/probe", options => options.EnableAuthenticationRefresh = true);
 await app.StartAsync();
 
@@ -124,7 +117,7 @@ static async Task<ScenarioResult> RunScenario(
     var root = baseAddress.TrimEnd('/');
     using var negotiate = new HttpRequestMessage(HttpMethod.Post, $"{root}/probe/negotiate?negotiateVersion=1");
     if (!string.IsNullOrWhiteSpace(negotiateIdentity))
-        negotiate.Headers.Add("X-Test-User", negotiateIdentity);
+        TestJwt.AddIdentity(negotiate, negotiateIdentity);
     using var negotiateResponse = await client.SendAsync(negotiate);
     var negotiateBody = await negotiateResponse.Content.ReadAsStringAsync();
     if (!negotiateResponse.IsSuccessStatusCode)
@@ -140,7 +133,7 @@ static async Task<ScenarioResult> RunScenario(
     using (var attach = new HttpRequestMessage(HttpMethod.Get, $"{root}/probe?id={Uri.EscapeDataString(token)}"))
     {
         if (!string.IsNullOrWhiteSpace(attachIdentity))
-            attach.Headers.Add("X-Test-User", attachIdentity);
+            TestJwt.AddIdentity(attach, attachIdentity);
         using var attachResponse = await client.SendAsync(attach);
         if (!attachResponse.IsSuccessStatusCode)
             return new(ScenarioStatus.Rejected, null, $"Initial attach HTTP {(int)attachResponse.StatusCode}: {await attachResponse.Content.ReadAsStringAsync()}");
@@ -152,7 +145,7 @@ static async Task<ScenarioResult> RunScenario(
     using (var send = new HttpRequestMessage(HttpMethod.Post, $"{root}/probe?id={Uri.EscapeDataString(token)}"))
     {
         if (!string.IsNullOrWhiteSpace(sendIdentity))
-            send.Headers.Add("X-Test-User", sendIdentity);
+            TestJwt.AddIdentity(send, sendIdentity);
         send.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(frames));
         send.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
         using var sendResponse = await client.SendAsync(send);
@@ -167,7 +160,7 @@ static async Task<ScenarioResult> RunScenario(
     {
         using var poll = new HttpRequestMessage(HttpMethod.Get, $"{root}/probe?id={Uri.EscapeDataString(token)}");
         if (!string.IsNullOrWhiteSpace(attachIdentity))
-            poll.Headers.Add("X-Test-User", attachIdentity);
+            TestJwt.AddIdentity(poll, attachIdentity);
         using var response = await client.SendAsync(poll);
         var body = await response.Content.ReadAsStringAsync();
         if (!response.IsSuccessStatusCode)
@@ -206,7 +199,7 @@ static async Task<RefreshScenarioResult> RunRefreshScenario(
 {
     var root = baseAddress.TrimEnd('/');
     using var negotiate = new HttpRequestMessage(HttpMethod.Post, $"{root}/probe/negotiate?negotiateVersion=1");
-    negotiate.Headers.Add("X-Test-User", initialIdentity);
+    TestJwt.AddIdentity(negotiate, initialIdentity);
     using var negotiateResponse = await client.SendAsync(negotiate);
     var negotiateBody = await negotiateResponse.Content.ReadAsStringAsync();
     if (!negotiateResponse.IsSuccessStatusCode)
@@ -219,7 +212,7 @@ static async Task<RefreshScenarioResult> RunRefreshScenario(
 
     using (var attach = new HttpRequestMessage(HttpMethod.Get, $"{root}/probe?id={Uri.EscapeDataString(token)}"))
     {
-        attach.Headers.Add("X-Test-User", initialIdentity);
+        TestJwt.AddIdentity(attach, initialIdentity);
         using var response = await client.SendAsync(attach);
         if (!response.IsSuccessStatusCode)
             return new((int)response.StatusCode, null, $"Initial attach failed: {await response.Content.ReadAsStringAsync()}");
@@ -229,7 +222,7 @@ static async Task<RefreshScenarioResult> RunRefreshScenario(
     using (var refresh = new HttpRequestMessage(HttpMethod.Post, $"{root}/probe/refresh"))
     {
         refresh.Headers.Add("X-SignalR-Connection-Token", token);
-        refresh.Headers.Add("X-Test-User", refreshIdentity);
+        TestJwt.AddIdentity(refresh, refreshIdentity);
         using var response = await client.SendAsync(refresh);
         refreshStatus = (int)response.StatusCode;
         if (!response.IsSuccessStatusCode && refreshStatus != 403)
@@ -243,7 +236,7 @@ static async Task<RefreshScenarioResult> RunRefreshScenario(
                  "{\"type\":1,\"invocationId\":\"refresh-check-1\",\"target\":\"WhoAmI\",\"arguments\":[]}" + rs;
     using (var send = new HttpRequestMessage(HttpMethod.Post, $"{root}/probe?id={Uri.EscapeDataString(token)}"))
     {
-        send.Headers.Add("X-Test-User", initialIdentity);
+        TestJwt.AddIdentity(send, initialIdentity);
         send.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(frames));
         send.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
         using var response = await client.SendAsync(send);
@@ -255,7 +248,7 @@ static async Task<RefreshScenarioResult> RunRefreshScenario(
     while (DateTime.UtcNow < deadline)
     {
         using var poll = new HttpRequestMessage(HttpMethod.Get, $"{root}/probe?id={Uri.EscapeDataString(token)}");
-        poll.Headers.Add("X-Test-User", initialIdentity);
+        TestJwt.AddIdentity(poll, initialIdentity);
         using var response = await client.SendAsync(poll);
         if (!response.IsSuccessStatusCode)
             return new(refreshStatus, null, $"Post-refresh poll rejected: {(int)response.StatusCode}");
@@ -277,6 +270,47 @@ static async Task<RefreshScenarioResult> RunRefreshScenario(
     }
 
     return new(refreshStatus, null, "No post-refresh Hub invocation completion within 10 seconds.");
+}
+
+
+public static class TestJwt
+{
+    private static readonly byte[] Key = Encoding.UTF8.GetBytes("signalr-identity-binding-poc-key-2026");
+
+    public static TokenValidationParameters ValidationParameters => new()
+    {
+        ValidateIssuer = false,
+        ValidateAudience = false,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Key),
+        NameClaimType = ClaimTypes.Name,
+        RoleClaimType = ClaimTypes.Role,
+        ClockSkew = TimeSpan.Zero
+    };
+
+    public static void AddIdentity(HttpRequestMessage request, string identity)
+    {
+        if (!string.IsNullOrWhiteSpace(identity))
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", CreateToken(identity));
+    }
+
+    private static string CreateToken(string identity)
+    {
+        static string Encode(byte[] bytes) =>
+            Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+        var header = Encode(Encoding.UTF8.GetBytes("{\"alg\":\"HS256\",\"typ\":\"JWT\"}"));
+        var payload = Encode(JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            sub = identity,
+            name = identity,
+            exp = DateTimeOffset.UtcNow.AddMinutes(10).ToUnixTimeSeconds()
+        }));
+        var input = header + "." + payload;
+        var signature = HMACSHA256.HashData(Key, Encoding.ASCII.GetBytes(input));
+        return input + "." + Encode(signature);
+    }
 }
 
 public sealed record RefreshScenarioResult(int RefreshStatus, string? Identity, string? Detail);
