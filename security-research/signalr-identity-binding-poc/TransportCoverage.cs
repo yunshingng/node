@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Http.Connections.Client;
@@ -50,15 +49,18 @@ public static class TransportCoverage
         string address, HttpTransportType transport, string? initialIdentity, string changedIdentity)
     {
         var currentIdentity = initialIdentity;
-        var tokenCalls = 0;
+        var bobRequestCount = 0;
+        var bobResponseCodes = new ConcurrentQueue<int>();
         var options = new Action<HttpConnectionOptions>(o =>
         {
             o.Transports = transport;
-            o.AccessTokenProvider = () =>
-            {
-                Interlocked.Increment(ref tokenCalls);
-                return Task.FromResult<string?>(currentIdentity is null ? null : TestJwt.CreateToken(currentIdentity));
-            };
+            o.HttpMessageHandlerFactory = handler =>
+                new DynamicBearerHandler(handler, () => currentIdentity, code =>
+                {
+                    Interlocked.Increment(ref bobRequestCount);
+                    if (code.HasValue)
+                        bobResponseCodes.Enqueue(code.Value);
+                });
 
             if (transport == HttpTransportType.WebSockets)
             {
@@ -86,7 +88,6 @@ public static class TransportCoverage
                 return new(CoverageStatus.Inconclusive,
                     $"{TransportName(transport)} {expectedInitial}->Bob: positive control returned '{initial}'.");
 
-            var callsBeforeSwitch = Volatile.Read(ref tokenCalls);
             currentIdentity = changedIdentity;
 
             try
@@ -100,18 +101,24 @@ public static class TransportCoverage
                     return new(CoverageStatus.Passed,
                         $"WebSockets {expectedInitial}->Bob: existing socket remained bound to {expectedInitial}; no per-invocation HTTP authentication request exists.");
 
+                if (transport != HttpTransportType.WebSockets &&
+                    after == expectedInitial &&
+                    Volatile.Read(ref bobRequestCount) > 0)
+                    return new(CoverageStatus.Passed,
+                        $"{TransportName(transport)} {expectedInitial}->Bob: Bob-authenticated HTTP request(s) were sent; Hub identity remained {expectedInitial}. HTTP statuses: {string.Join(",", bobResponseCodes)}.");
+
                 return new(CoverageStatus.Inconclusive,
-                    $"{TransportName(transport)} {expectedInitial}->Bob: invocation completed as '{after}', token provider calls={Volatile.Read(ref tokenCalls)}.");
+                    $"{TransportName(transport)} {expectedInitial}->Bob: invocation completed as '{after}', Bob-authenticated requests={Volatile.Read(ref bobRequestCount)}.");
             }
             catch (Exception ex)
             {
-                var providerWasUsed = Volatile.Read(ref tokenCalls) > callsBeforeSwitch;
-                if (transport != HttpTransportType.WebSockets && providerWasUsed && IsForbidden(ex))
+                var bobRequestWasSent = Volatile.Read(ref bobRequestCount) > 0;
+                if (transport != HttpTransportType.WebSockets && bobRequestWasSent && IsForbidden(ex))
                     return new(CoverageStatus.Passed,
-                        $"{TransportName(transport)} {expectedInitial}->Bob: changed-identity HTTP request rejected ({ex.GetType().Name}: {ex.Message}).");
+                        $"{TransportName(transport)} {expectedInitial}->Bob: changed-identity HTTP request rejected ({ex.GetType().Name}: {ex.Message}); HTTP statuses: {string.Join(",", bobResponseCodes)}.");
 
                 return new(CoverageStatus.Inconclusive,
-                    $"{TransportName(transport)} {expectedInitial}->Bob: request failed without a confirmed identity-binding 403 (provider called after switch={providerWasUsed}): {ex.GetType().Name}: {ex.Message}");
+                    $"{TransportName(transport)} {expectedInitial}->Bob: request failed without a confirmed identity-binding 403 (Bob-authenticated request sent={bobRequestWasSent}): {ex.GetType().Name}: {ex.Message}");
             }
         }
         catch (Exception ex)
@@ -136,6 +143,7 @@ public static class TransportCoverage
         var connection = new HubConnectionBuilder()
             .WithUrl($"{address.TrimEnd('/')}/probe", HttpTransportType.WebSockets, options =>
             {
+                options.AccessTokenProvider = () => Task.FromResult<string?>(TestJwt.CreateToken(currentIdentity));
                 options.WebSocketFactory = async (context, cancellationToken) =>
                 {
                     var socket = new ClientWebSocket();
@@ -259,5 +267,42 @@ public sealed class SignalRLogCaptureProvider : ILoggerProvider
             if (eventId.Name == "UserNameChangedRejected")
                 owner.Record(formatter(state, exception));
         }
+    }
+}
+
+
+public sealed class DynamicBearerHandler : DelegatingHandler
+{
+    private readonly Func<string?> _identityProvider;
+    private readonly Action<int?> _observeBobResponse;
+
+    public DynamicBearerHandler(
+        HttpMessageHandler innerHandler,
+        Func<string?> identityProvider,
+        Action<int?> observeBobResponse) : base(innerHandler)
+    {
+        _identityProvider = identityProvider;
+        _observeBobResponse = observeBobResponse;
+    }
+
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken)
+    {
+        var identity = _identityProvider();
+        if (identity is null)
+        {
+            request.Headers.Authorization = null;
+        }
+        else
+        {
+            request.Headers.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", TestJwt.CreateToken(identity));
+        }
+
+        var response = await base.SendAsync(request, cancellationToken);
+        if (identity == "Bob")
+            _observeBobResponse((int)response.StatusCode);
+        return response;
     }
 }
