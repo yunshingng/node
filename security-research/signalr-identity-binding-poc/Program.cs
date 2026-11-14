@@ -17,13 +17,18 @@ app.Use(async (context, next) =>
     if (!string.IsNullOrWhiteSpace(testUser))
     {
         var identity = new ClaimsIdentity(
-            new[]\n            {\n                new Claim(ClaimTypes.Name, testUser),\n                new Claim(ClaimTypes.NameIdentifier, testUser)\n            },
+            new[]
+            {
+                new Claim(ClaimTypes.Name, testUser),
+                new Claim(ClaimTypes.NameIdentifier, testUser)
+            },
             authenticationType: "LocalSignalRPoC",
             nameType: ClaimTypes.Name,
             roleType: ClaimTypes.Role);
         context.User = new ClaimsPrincipal(identity);
     }
-    Console.WriteLine($"REQUEST {context.Request.Method} {context.Request.Path}: name={context.User.Identity?.Name ?? "<null>"}; nameId={context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "<null>"}");\n    await next();
+    Console.WriteLine($"REQUEST {context.Request.Method} {context.Request.Path}: name={context.User.Identity?.Name ?? "<null>"}; nameId={context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "<null>"}");
+    await next();
 });
 
 app.MapHub<IdentityProbeHub>("/probe");
