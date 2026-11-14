@@ -226,8 +226,9 @@ static async Task<RefreshScenarioResult> RunRefreshScenario(
     }
 
     int refreshStatus;
-    using (var refresh = new HttpRequestMessage(HttpMethod.Post, $"{root}/probe/refresh?id={Uri.EscapeDataString(token)}"))
+    using (var refresh = new HttpRequestMessage(HttpMethod.Post, $"{root}/probe/refresh"))
     {
+        refresh.Headers.Add("X-SignalR-Connection-Token", token);
         refresh.Headers.Add("X-Test-User", refreshIdentity);
         using var response = await client.SendAsync(refresh);
         refreshStatus = (int)response.StatusCode;
