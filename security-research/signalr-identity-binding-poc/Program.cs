@@ -106,12 +106,20 @@ static async Task<ScenarioResult> RunScenario(
     if (string.IsNullOrWhiteSpace(token))
         return new ScenarioResult(ScenarioStatus.Rejected, null, "Negotiate returned an empty connectionToken.");
 
-    // Queue a valid JSON Hub handshake and invocation before the first poll
-    // attaches the transport under attachIdentity.
+    // Long Polling must be attached before the client can POST Hub protocol
+    // frames. Start the first poll under attachIdentity, then send the
+    // handshake and invocation under sendIdentity while that poll is pending.
     const char recordSeparator = '\u001e';
     var queuedFrames =
         "{\"protocol\":\"json\",\"version\":1}" + recordSeparator +
         "{\"type\":1,\"invocationId\":\"identity-check-1\",\"target\":\"WhoAmI\",\"arguments\":[]}" + recordSeparator;
+
+    using var poll = new HttpRequestMessage(
+        HttpMethod.Get,
+        $"{baseAddress.TrimEnd('/')}/probe?id={Uri.EscapeDataString(token)}");
+    poll.Headers.Add("X-Test-User", attachIdentity);
+    var pollTask = client.SendAsync(poll, HttpCompletionOption.ResponseHeadersRead);
+    await Task.Delay(150);
 
     using var send = new HttpRequestMessage(
         HttpMethod.Post,
@@ -123,16 +131,12 @@ static async Task<ScenarioResult> RunScenario(
     using var sendResponse = await client.SendAsync(send);
     var sendBody = await sendResponse.Content.ReadAsStringAsync();
     if (!sendResponse.IsSuccessStatusCode)
-        return new ScenarioResult(ScenarioStatus.Rejected, null, $"Pre-attach send returned {(int)sendResponse.StatusCode}: {sendBody}");
+    {
+        try { using var ignored = await pollTask; } catch { }
+        return new ScenarioResult(ScenarioStatus.Rejected, null, $"Send returned {(int)sendResponse.StatusCode}: {sendBody}");
+    }
 
-    // This is the first transport request for this connection. Its test
-    // identity differs from the negotiate/send identity in the candidate case.
-    using var poll = new HttpRequestMessage(
-        HttpMethod.Get,
-        $"{baseAddress.TrimEnd('/')}/probe?id={Uri.EscapeDataString(token)}");
-    poll.Headers.Add("X-Test-User", attachIdentity);
-
-    using var pollResponse = await client.SendAsync(poll);
+    using var pollResponse = await pollTask;
     var responseBody = await pollResponse.Content.ReadAsStringAsync();
     if (!pollResponse.IsSuccessStatusCode)
         return new ScenarioResult(ScenarioStatus.Rejected, null, $"First poll returned {(int)pollResponse.StatusCode}: {responseBody}");
