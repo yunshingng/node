@@ -1,38 +1,32 @@
 # SignalR identity-binding runtime PoC
 
-This is a **local-only, non-destructive** test harness for checking whether a
-SignalR connection's authenticated identity remains bound across the initial
-Long Polling attach and subsequent send requests.
+A local-only, non-destructive test harness for checking whether a SignalR
+connection's identity remains bound across negotiation, the initial Long
+Polling attach, and later send requests.
 
-It starts an in-process ASP.NET Core SignalR server bound to `127.0.0.1`,
-uses synthetic identities (`Alice` and `Bob`), and sends only a harmless
-`WhoAmI` Hub invocation. It does not contact or target any external server.
+The harness starts an ASP.NET Core SignalR server on `127.0.0.1`, uses
+synthetic identities (`Alice` and `Bob`), and invokes only a harmless
+`WhoAmI` Hub method. It does not contact an external server.
 
-## Test sequence
+## Scenarios
 
-For each scenario:
+Each scenario negotiates a connection, performs its first Long Polling GET,
+then POSTs a valid JSON Hub handshake and `WhoAmI` invocation. The response
+from the Hub reports `Context.User.Identity.Name`.
 
-1. Negotiate as Alice.
-2. Start the first Long Polling GET under the configured attach identity.
-3. While that poll is pending, POST the JSON Hub handshake and `WhoAmI`
-   invocation under the configured send identity.
-4. Inspect the Hub completion result, which is the identity observed by
-   `Hub.Context.User`.
+1. Positive control: Alice negotiates, attaches, and sends.
+2. Authenticated send-time switch: Alice negotiates and attaches; Bob sends.
+3. Anonymous send-time switch: anonymous negotiation and attach; Bob sends.
+4. Initial-attach switch control: Alice negotiates; Bob performs the first
+   attach; Alice sends.
 
-A same-identity Alice/Alice/Alice positive control runs first. The cross-identity
-case uses Alice for negotiate, Bob for the initial attach, and Alice for send.
-The test is meaningful only if the positive control succeeds.
-
-**Important limitation:** this valid Long Polling sequence does not attempt to
-send Hub protocol data before a transport is attached. The first attempt to do
-that was rejected with HTTP 400 by SignalR. Therefore this harness tests
-identity consistency between attach and send; it does not, by itself, prove or
-disprove the narrower pre-attach queued-invocation hypothesis. That requires a
-protocol-valid way to queue data before identity binding, if such a path exists.
+The critical send-time cases keep the identity stable during negotiation and
+initial attach. This avoids confusing a rejection at initial attach with a
+rejection of a later send request.
 
 ## Run locally
 
-Requires the .NET 11.0 SDK:
+Requires the .NET 11 SDK:
 
 ```sh
 dotnet --info
@@ -41,21 +35,21 @@ dotnet run --project SignalRIdentityBindingPoc.csproj --configuration Release
 
 ## Result interpretation
 
-- `VULNERABILITY_REPRODUCED`: the cross-identity invocation completed and
-  the Hub observed Bob. This is evidence of identity confusion in the exact
-  runtime used by the test.
-- `NOT_REPRODUCED`: the invocation completed, but the Hub did not observe
-  Bob.
-- `INCONCLUSIVE`: the positive control failed, the request was rejected, or
-  no matching Hub completion was observed.
+- `VULNERABILITY_REPRODUCED`: a Hub invocation completed and the Hub observed
+  Bob in a scenario where the connection was initially bound as Alice or
+  anonymous. This is evidence of identity confusion in this exact runtime.
+- `NOT_REPRODUCED`: no candidate invocation completed as Bob. A request
+  rejected before Hub execution is a negative result for that specific path.
+- `INCONCLUSIVE`: the positive control failed or a candidate did not produce
+  a definitive response.
 
-A non-reproduction is not proof that every transport or deployment
-configuration is safe. Record the exact SDK/runtime version and repeat against
-the official .NET 11.0.0 release runtime. Do not describe a source-only result
-as a runtime exploit.
+A non-reproduction does not prove every transport, authentication handler,
+proxy, or race condition is safe. The test uses a synthetic header-based
+principal middleware, not a production authentication scheme. Record the
+exact SDK/runtime version and repeat with the official target runtime.
 
 ## Scope and safety
 
-The test server binds to loopback only. It has no privileged Hub methods, data
-access, persistence, or external target. The synthetic identity header is test
+The server binds to loopback only. It has no privileged Hub methods, data
+access, persistence, or external target. The `X-Test-User` header is test
 scaffolding, not a production authentication design.
