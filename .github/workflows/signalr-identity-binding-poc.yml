@@ -1,0 +1,36 @@
+name: SignalR identity-binding PoC
+
+on:
+  push:
+    branches:
+      - security-research/signalr-identity-binding-poc
+    paths:
+      - "security-research/signalr-identity-binding-poc/**"
+      - ".github/workflows/signalr-identity-binding-poc.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-check:
+    name: Run local .NET 11.0.0 SignalR identity test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install .NET 11 SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "11.0.100"
+
+      - name: Record SDK and installed runtimes
+        run: |
+          dotnet --info
+          dotnet --list-runtimes
+
+      - name: Run isolated runtime PoC
+        working-directory: security-research/signalr-identity-binding-poc
+        run: dotnet run --configuration Release
