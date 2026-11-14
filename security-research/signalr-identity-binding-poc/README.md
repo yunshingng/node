@@ -50,3 +50,6 @@ exploit.
 The test server binds to loopback only. It has no privileged Hub methods, data
 access, persistence, or external target. The synthetic identity header is
 test scaffolding, not a production authentication design.
+
+
+CI trigger: this branch update runs the workflow registered on the repository default branch.
