@@ -301,12 +301,16 @@ public static class TestJwt
             Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
         var header = Encode(Encoding.UTF8.GetBytes("{\"alg\":\"HS256\",\"typ\":\"JWT\"}"));
-        var payload = Encode(JsonSerializer.SerializeToUtf8Bytes(new
+        // Emit the exact claim type configured by TokenValidationParameters.
+        // Keep "sub" as well: the JWT handler maps it to NameIdentifier for
+        // SignalR's default IUserIdProvider.
+        var claims = new Dictionary<string, object>
         {
-            sub = identity,
-            name = identity,
-            exp = DateTimeOffset.UtcNow.AddMinutes(10).ToUnixTimeSeconds()
-        }));
+            ["sub"] = identity,
+            [ClaimTypes.Name] = identity,
+            ["exp"] = DateTimeOffset.UtcNow.AddMinutes(10).ToUnixTimeSeconds()
+        };
+        var payload = Encode(JsonSerializer.SerializeToUtf8Bytes(claims));
         var input = header + "." + payload;
         var signature = HMACSHA256.HashData(Key, Encoding.ASCII.GetBytes(input));
         return input + "." + Encode(signature);
