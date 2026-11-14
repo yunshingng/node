@@ -270,7 +270,9 @@ static async Task<RefreshScenarioResult> RunRefreshScenario(
     return new(refreshStatus, null, "No post-refresh Hub invocation completion within 10 seconds.");
 }
 
-public sealed record RefreshScenarioResult(int RefreshStatus, string? Identity, string? Detail);\n\npublic sealed class IdentityProbeHub : Hub
+public sealed record RefreshScenarioResult(int RefreshStatus, string? Identity, string? Detail);
+
+public sealed class IdentityProbeHub : Hub
 {
     public string WhoAmI() => Context.User?.Identity?.Name ?? "<anonymous>";
 }
