@@ -136,10 +136,21 @@ static async Task<ScenarioResult> RunScenario(
         return new ScenarioResult(ScenarioStatus.Rejected, null, $"Send returned {(int)sendResponse.StatusCode}: {sendBody}");
     }
 
-    using var pollResponse = await pollTask;
+    // The initial GET establishes the Long Polling transport and commonly
+    // completes with an empty body. Start a second GET to receive Hub frames.
+    using var initialPollResponse = await pollTask;
+    var initialPollBody = await initialPollResponse.Content.ReadAsStringAsync();
+    if (!initialPollResponse.IsSuccessStatusCode)
+        return new ScenarioResult(ScenarioStatus.Rejected, null, $"Initial poll returned {(int)initialPollResponse.StatusCode}: {initialPollBody}");
+
+    using var receive = new HttpRequestMessage(
+        HttpMethod.Get,
+        $"{baseAddress.TrimEnd('/')}/probe?id={Uri.EscapeDataString(token)}");
+    receive.Headers.Add("X-Test-User", attachIdentity);
+    using var pollResponse = await client.SendAsync(receive);
     var responseBody = await pollResponse.Content.ReadAsStringAsync();
     if (!pollResponse.IsSuccessStatusCode)
-        return new ScenarioResult(ScenarioStatus.Rejected, null, $"First poll returned {(int)pollResponse.StatusCode}: {responseBody}");
+        return new ScenarioResult(ScenarioStatus.Rejected, null, $"Receive poll returned {(int)pollResponse.StatusCode}: {responseBody}");
 
     foreach (var frame in responseBody.Split(recordSeparator, StringSplitOptions.RemoveEmptyEntries))
     {
