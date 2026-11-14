@@ -31,7 +31,7 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.MapHub<IdentityProbeHub>("/probe");
+app.MapHub<IdentityProbeHub>("/probe", options => options.EnableAuthenticationRefresh = true);
 await app.StartAsync();
 
 try
@@ -66,6 +66,15 @@ try
     // Separate control: identity changes during initial attach, before Hub send.
     var attachSwitch = await RunScenario(client, address, "Alice", "Alice", "Bob");
     Print("ATTACH SWITCH Alice negotiate / Bob attach / Alice send", attachSwitch);
+
+    // .NET 11 authentication refresh endpoint: verify changed user is rejected
+    // and the existing connection retains Alice after a rejected refresh.
+    var refreshChanged = await RunRefreshScenario(client, address, "Alice", "Bob");
+    Console.WriteLine($"REFRESH Alice connection / Bob refresh: HTTP {refreshChanged.RefreshStatus}; Hub after refresh saw: {refreshChanged.Identity ?? "<none>"}; {refreshChanged.Detail ?? ""}");
+
+    // Positive control: refreshing credentials for the same user should succeed.
+    var refreshSame = await RunRefreshScenario(client, address, "Alice", "Alice");
+    Console.WriteLine($"REFRESH Alice connection / Alice refresh: HTTP {refreshSame.RefreshStatus}; Hub after refresh saw: {refreshSame.Identity ?? "<none>"}; {refreshSame.Detail ?? ""}");
 
     var candidates = new[]
     {
@@ -183,7 +192,85 @@ static async Task<ScenarioResult> RunScenario(
     return new(ScenarioStatus.NoCompletion, null, $"No invocation completion within 10s. Poll payloads: {diagnostic}");
 }
 
-public sealed class IdentityProbeHub : Hub
+
+static async Task<RefreshScenarioResult> RunRefreshScenario(
+    HttpClient client, string baseAddress, string initialIdentity, string refreshIdentity)
+{
+    var root = baseAddress.TrimEnd('/');
+    using var negotiate = new HttpRequestMessage(HttpMethod.Post, $"{root}/probe/negotiate?negotiateVersion=1");
+    negotiate.Headers.Add("X-Test-User", initialIdentity);
+    using var negotiateResponse = await client.SendAsync(negotiate);
+    var negotiateBody = await negotiateResponse.Content.ReadAsStringAsync();
+    if (!negotiateResponse.IsSuccessStatusCode)
+        return new((int)negotiateResponse.StatusCode, null, $"Negotiate failed: {negotiateBody}");
+
+    using var json = JsonDocument.Parse(negotiateBody);
+    var token = json.RootElement.GetProperty("connectionToken").GetString();
+    if (string.IsNullOrWhiteSpace(token))
+        return new(0, null, "Missing connectionToken.");
+
+    using (var attach = new HttpRequestMessage(HttpMethod.Get, $"{root}/probe?id={Uri.EscapeDataString(token)}"))
+    {
+        attach.Headers.Add("X-Test-User", initialIdentity);
+        using var response = await client.SendAsync(attach);
+        if (!response.IsSuccessStatusCode)
+            return new((int)response.StatusCode, null, $"Initial attach failed: {await response.Content.ReadAsStringAsync()}");
+    }
+
+    int refreshStatus;
+    using (var refresh = new HttpRequestMessage(HttpMethod.Post, $"{root}/probe/refresh?id={Uri.EscapeDataString(token)}"))
+    {
+        refresh.Headers.Add("X-Test-User", refreshIdentity);
+        using var response = await client.SendAsync(refresh);
+        refreshStatus = (int)response.StatusCode;
+        if (!response.IsSuccessStatusCode && refreshStatus != 403)
+            return new(refreshStatus, null, $"Unexpected refresh response: {await response.Content.ReadAsStringAsync()}");
+    }
+
+    // Invoke as the original identity. A rejected refresh must leave the
+    // connection principal unchanged.
+    const char rs = '\u001e';
+    var frames = "{\"protocol\":\"json\",\"version\":1}" + rs +
+                 "{\"type\":1,\"invocationId\":\"refresh-check-1\",\"target\":\"WhoAmI\",\"arguments\":[]}" + rs;
+    using (var send = new HttpRequestMessage(HttpMethod.Post, $"{root}/probe?id={Uri.EscapeDataString(token)}"))
+    {
+        send.Headers.Add("X-Test-User", initialIdentity);
+        send.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(frames));
+        send.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        using var response = await client.SendAsync(send);
+        if (!response.IsSuccessStatusCode)
+            return new(refreshStatus, null, $"Post-refresh invocation rejected: {(int)response.StatusCode} {await response.Content.ReadAsStringAsync()}");
+    }
+
+    var deadline = DateTime.UtcNow.AddSeconds(10);
+    while (DateTime.UtcNow < deadline)
+    {
+        using var poll = new HttpRequestMessage(HttpMethod.Get, $"{root}/probe?id={Uri.EscapeDataString(token)}");
+        poll.Headers.Add("X-Test-User", initialIdentity);
+        using var response = await client.SendAsync(poll);
+        if (!response.IsSuccessStatusCode)
+            return new(refreshStatus, null, $"Post-refresh poll rejected: {(int)response.StatusCode}");
+        var body = await response.Content.ReadAsStringAsync();
+        foreach (var frame in body.Split(rs, StringSplitOptions.RemoveEmptyEntries))
+        {
+            try
+            {
+                using var message = JsonDocument.Parse(frame);
+                var obj = message.RootElement;
+                if (obj.TryGetProperty("type", out var type) && type.GetInt32() == 3 &&
+                    obj.TryGetProperty("invocationId", out var id) && id.GetString() == "refresh-check-1" &&
+                    obj.TryGetProperty("result", out var result))
+                    return new(refreshStatus, result.GetString(), null);
+            }
+            catch (JsonException) { }
+        }
+        await Task.Delay(50);
+    }
+
+    return new(refreshStatus, null, "No post-refresh Hub invocation completion within 10 seconds.");
+}
+
+public sealed record RefreshScenarioResult(int RefreshStatus, string? Identity, string? Detail);\n\npublic sealed class IdentityProbeHub : Hub
 {
     public string WhoAmI() => Context.User?.Identity?.Name ?? "<anonymous>";
 }
