@@ -12,6 +12,8 @@ using Microsoft.AspNetCore.SignalR;
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls("http://127.0.0.1:0");
 builder.Services.AddSignalR();
+var statefulReconnectLogs = new SignalRLogCaptureProvider();
+builder.Logging.AddProvider(statefulReconnectLogs);
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options => options.TokenValidationParameters = TestJwt.ValidationParameters);
 builder.Services.AddAuthorization();
@@ -24,7 +26,11 @@ app.Use(async (context, next) =>
     Console.WriteLine($"REQUEST {context.Request.Method} {context.Request.Path}: name={context.User.Identity?.Name ?? "<null>"}; nameId={context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "<null>"}");
     await next();
 });
-app.MapHub<IdentityProbeHub>("/probe", options => options.EnableAuthenticationRefresh = true);
+app.MapHub<IdentityProbeHub>("/probe", options =>
+{
+    options.EnableAuthenticationRefresh = true;
+    options.AllowStatefulReconnects = true;
+});
 await app.StartAsync();
 
 try
@@ -69,6 +75,9 @@ try
     var refreshSame = await RunRefreshScenario(client, address, "Alice", "Alice");
     Console.WriteLine($"REFRESH Alice connection / Alice refresh: HTTP {refreshSame.RefreshStatus}; Hub after refresh saw: {refreshSame.Identity ?? "<none>"}; {refreshSame.Detail ?? ""}");
 
+    var transportCoverage = await TransportCoverage.RunAsync(address, statefulReconnectLogs);
+    Console.WriteLine($"TRANSPORT COVERAGE: {transportCoverage.Status}; {transportCoverage.Detail}");
+
     var candidates = new[]
     {
         ("authenticated send switch", authenticatedSwitch),
@@ -78,12 +87,12 @@ try
 
     var reproduced = candidates.FirstOrDefault(x =>
         x.Item2.Status == ScenarioStatus.Completed && x.Item2.Identity == "Bob");
-    if (reproduced.Item2 is not null)
+    if (transportCoverage.Status == CoverageStatus.VulnerabilityReproduced || reproduced.Item2 is not null)
     {
         Console.WriteLine($"VULNERABILITY_REPRODUCED: {reproduced.Item1}; Hub observed Bob.");
         Environment.ExitCode = 0;
     }
-    else if (candidates.Any(x => x.Item2.Status == ScenarioStatus.NoCompletion))
+    else if (transportCoverage.Status == CoverageStatus.Inconclusive || candidates.Any(x => x.Item2.Status == ScenarioStatus.NoCompletion))
     {
         Console.WriteLine("INCONCLUSIVE: at least one candidate did not produce a definitive response.");
         Environment.ExitCode = 2;
@@ -295,7 +304,7 @@ public static class TestJwt
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", CreateToken(identity));
     }
 
-    private static string CreateToken(string identity)
+    public static string CreateToken(string identity)
     {
         static string Encode(byte[] bytes) =>
             Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
