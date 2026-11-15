@@ -1,0 +1,62 @@
+name: Oasis Runtime round-results financial E2E
+
+on:
+  push:
+    branches:
+      - repro/oasis-round-results-e2e-20261116
+    paths:
+      - '.github/scripts/patch-oasis-round-results-e2e.mjs'
+      - '.github/workflows/oasis-round-results-e2e.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  round-results-runtime-e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout harness repository
+        uses: actions/checkout@v4
+
+      - name: Checkout affected Oasis SDK commit
+        uses: actions/checkout@v4
+        with:
+          repository: oasisprotocol/oasis-sdk
+          ref: beae84eac81e67a5134825eb192496c5af079cae
+          path: oasis-sdk
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-08-16
+          components: rustfmt
+
+      - name: Inject consensus MKVS and financial regression test
+        run: node .github/scripts/patch-oasis-round-results-e2e.mjs oasis-sdk/runtime-sdk/src/dispatcher.rs
+
+      - name: Format SDK test
+        working-directory: oasis-sdk
+        run: cargo fmt --manifest-path runtime-sdk/Cargo.toml
+
+      - name: Run SDK Runtime financial state-transition E2E
+        working-directory: oasis-sdk
+        env:
+          CARGO_TERM_COLOR: always
+        run: cargo test --manifest-path runtime-sdk/Cargo.toml test_host_forged_round_results_change_consensus_accounts_state -- --nocapture
+
+      - name: Record verification scope
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TARGET_COMMIT: beae84eac81e67a5134825eb192496c5af079cae
+        run: |
+          {
+            echo "job_status=${JOB_STATUS}"
+            echo "workflow_run=${RUN_URL}"
+            echo "target_commit=${TARGET_COMMIT}"
+            echo "test=test_host_forged_round_results_change_consensus_accounts_state"
+            echo "scope=SDK Runtime dispatcher message-result processing with a real consensus MKVS fixture; not a live signed Core enclave request or committee-finalization test"
+          } | tee round-results-e2e-result.txt
+          cat round-results-e2e-result.txt >> "$GITHUB_STEP_SUMMARY"
