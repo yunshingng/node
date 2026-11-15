@@ -14,6 +14,77 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  non-sgx-e2e:
+    name: Run hosted non-SGX E2E baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    defaults:
+      run:
+        shell: bash
+    env:
+      # Explicitly use Oasis Core's documented unsafe non-SGX development mode.
+      # This job is a baseline only and is NOT a hardware-SGX result.
+      OASIS_UNSAFE_SKIP_AVR_VERIFY: "1"
+      OASIS_UNSAFE_SKIP_KM_POLICY: "1"
+      OASIS_UNSAFE_ALLOW_DEBUG_ENCLAVES: "1"
+      OASIS_BADGER_NO_JEMALLOC: "1"
+
+    steps:
+      - name: Checkout pinned Oasis Core source
+        uses: actions/checkout@v4
+        with:
+          repository: oasisprotocol/oasis-core
+          ref: 5d4b23dad0a07c358d94f784fdc87cb4099ffe50
+          path: oasis-core
+          persist-credentials: false
+
+      - name: Install Oasis Core system prerequisites
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            bubblewrap gcc g++ gcc-multilib clang protobuf-compiler \
+            make cmake libssl-dev libseccomp-dev pkg-config
+
+      - name: Set up required Go version
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: oasis-core/go/go.mod
+          cache: true
+          cache-dependency-path: oasis-core/go/go.sum
+
+      - name: Install Rust SGX build utilities
+        working-directory: oasis-core
+        run: |
+          set -euxo pipefail
+          rustup show
+          cargo install fortanix-sgx-tools
+          cargo install sgxs-tools
+          rustup target list --installed | grep -Fx x86_64-fortanix-unknown-sgx
+
+      - name: Build Oasis Core for non-SGX development
+        working-directory: oasis-core
+        run: |
+          set -euxo pipefail
+          make
+
+      - name: Run Oasis Core E2E in non-SGX mode
+        working-directory: oasis-core
+        run: |
+          set -euxo pipefail
+          unset OASIS_TEE_HARDWARE
+          make test-e2e 2>&1 | tee /tmp/oasis-non-sgx-e2e.log
+
+      - name: Upload non-SGX E2E logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oasis-core-non-sgx-e2e-${{ github.run_id }}
+          if-no-files-found: warn
+          path: |
+            /tmp/oasis-non-sgx-e2e.log
+            /tmp/oasis-test-runner*/
+
   sgx-e2e:
     name: Build and run Oasis Core on Intel SGX
     runs-on: [self-hosted, linux, x64, oasis-sgx]
