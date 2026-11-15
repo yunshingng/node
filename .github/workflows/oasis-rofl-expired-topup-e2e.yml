@@ -1,0 +1,46 @@
+name: Oasis ROFL expired top-up runtime E2E
+
+on:
+  push:
+    branches:
+      - repro/oasis-rofl-expired-topup-e2e-20261115
+
+permissions:
+  contents: read
+
+jobs:
+  rofl-market-runtime-e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout harness repository
+        uses: actions/checkout@v4
+
+      - name: Checkout affected Oasis SDK commit
+        uses: actions/checkout@v4
+        with:
+          repository: oasisprotocol/oasis-sdk
+          ref: beae84eac81e67a5134825eb192496c5af079cae
+          path: oasis-sdk
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-08-16
+          components: rustfmt
+
+      - name: Show toolchain
+        run: rustc --version && cargo --version
+
+      - name: Inject isolated runtime regression test
+        run: node .github/scripts/patch-oasis-rofl-e2e.mjs oasis-sdk/runtime-sdk/modules/rofl-market/src/test.rs
+
+      - name: Check formatting
+        working-directory: oasis-sdk
+        run: cargo fmt --manifest-path runtime-sdk/modules/rofl-market/Cargo.toml -- --check
+
+      - name: Run Oasis Rust runtime transaction E2E
+        working-directory: oasis-sdk
+        env:
+          CARGO_TERM_COLOR: always
+        run: cargo test --manifest-path runtime-sdk/modules/rofl-market/Cargo.toml test_instance_topup_after_expiry_charges_full_fee_without_recovering_gap -- --nocapture
