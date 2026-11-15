@@ -14,7 +14,7 @@ use oasis_runtime_sdk::{
         common::{crypto::signature::PublicKey, namespace::Namespace, version::Version},
         enclave_rpc::types as enclave_rpc_types,
         host::{bundle_manager, volume_manager},
-        protocol::{Body, Message, MessageType, RuntimeInfoRequest},
+        types::{Body, Message, MessageType, RuntimeInfoRequest},
     },
 };
 
