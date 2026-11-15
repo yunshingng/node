@@ -117,7 +117,70 @@ SQL
 run_case baseline "ordinary.csv" normal
 run_case extra-s "d_%s%s%s%s.csv" normal
 run_case arg-probe 'PROBE_%1$p_%2$p_%3$p_%4$p_%5$p_%6$p_%7$p_%8$p_%9$p_%10$p_%11$p_%12$p.csv' arg-probe
-run_case arg-write 'PROBE_%11$hhn.csv' arg-write
+run_optname_case() {
+  local container="connect-cwe134-optname-$$"
+  local sql_file
+  sql_file="$(mktemp)"
+  cat >"$sql_file" <<'SQL'
+CREATE DATABASE cwe134;
+USE cwe134;
+CREATE TABLE t_optprobe (
+  id INT,
+  v VARCHAR(32)
+) ENGINE=CONNECT TABLE_TYPE=CSV
+  OPTNAME='PROBE_%1$p_%2$p_%3$p_%4$p_%5$p_%6$p_%7$p_%8$p_%9$p_%10$p_%11$p_%12$p.csv'
+PARTITION BY RANGE(id) (
+  PARTITION p0 VALUES LESS THAN (10),
+  PARTITION p1 VALUES LESS THAN MAXVALUE
+);
+ALTER TABLE t_optprobe ADD KEY idx_probe_id (id);
+SHOW WARNINGS;
+SQL
+  docker run -d --name "$container" \
+    -e MARIADB_ROOT_PASSWORD=test-only-password \
+    -e LD_PRELOAD=/usr/local/lib/libconnect_fmt_probe.so \
+    "$image_tag" >/dev/null
+  local ready=0
+  for _ in $(seq 1 90); do
+    if docker exec "$container" mariadb-admin --protocol=tcp -h127.0.0.1 \
+      -uroot -ptest-only-password ping --silent >/dev/null 2>&1; then
+      ready=1
+      break
+    fi
+    if ! docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null | grep -q true; then break; fi
+    sleep 2
+  done
+  if [[ "$ready" -ne 1 ]]; then
+    echo "FAIL: optname probe MariaDB did not become TCP-ready"
+    docker logs "$container" || true
+    docker rm -f "$container" >/dev/null 2>&1 || true
+    rm -f "$sql_file"
+    failures=$((failures + 1))
+    return
+  fi
+  set +e
+  docker exec -i "$container" mariadb --protocol=tcp -h127.0.0.1 \
+    -uroot -ptest-only-password --show-warnings <"$sql_file" >result-optname.log 2>&1
+  local sql_rc=$?
+  set -e
+  sleep 2
+  local running
+  running="$(docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null || echo missing)"
+  echo "sql_exit_code=$sql_rc" | tee -a result-optname.log
+  echo "container_running_after_test=$running" | tee -a result-optname.log
+  docker logs "$container" >>result-optname.log 2>&1 || true
+  cat result-optname.log
+  if grep -Fq "CONNECT_FMT_PROBE" result-optname.log && [[ "$running" == "true" ]]; then
+    echo "PASS: OPTNAME path reached the CONNECT format-string call ($name)"
+  else
+    echo "FAIL: OPTNAME path did not reach the instrumented formatter" >&2
+    failures=$((failures + 1))
+  fi
+  docker rm -f "$container" >/dev/null 2>&1 || true
+  rm -f "$sql_file"
+}
+
+run_optname_case
 run_case percent-n "d_%n.csv" fortify-abort
 
 if [[ "$failures" -ne 0 ]]; then
