@@ -66,7 +66,6 @@ jobs:
               # container runs as root. Trust the checked-out source directory
               # so Go's VCS stamping can execute git status during the build.
               git config --global --add safe.directory /code
-              git status --short
               make
               unset OASIS_TEE_HARDWARE
               make test-e2e 2>&1 | tee /tmp/oasis-non-sgx-e2e.log
