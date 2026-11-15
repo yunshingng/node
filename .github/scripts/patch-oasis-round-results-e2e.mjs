@@ -73,7 +73,7 @@ const regressionTest = String.raw`
             storage::mkvs::{self, MKVS as _},
         };
         use crate::{
-            modules::accounts::API as _,
+            modules::accounts::API,
             state::{CurrentState, Options, TransactionResult},
             storage::MKVSStore,
             testing::mock::Mock,
