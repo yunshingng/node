@@ -48,29 +48,22 @@ jobs:
             -v "$GITHUB_WORKSPACE/oasis-core:/code" \
             -v "$RUNNER_TEMP/oasis-tmp:/tmp" \
             -w /code \
+            -e GIT_CONFIG_COUNT=1 \
+            -e GIT_CONFIG_KEY_0=safe.directory \
+            -e 'GIT_CONFIG_VALUE_0=*' \
             -e OASIS_UNSAFE_SKIP_AVR_VERIFY=1 \
             -e OASIS_UNSAFE_SKIP_KM_POLICY=1 \
             -e OASIS_UNSAFE_ALLOW_DEBUG_ENCLAVES=1 \
             -e OASIS_BADGER_NO_JEMALLOC=1 \
             ghcr.io/oasisprotocol/oasis-core-dev:master \
-            bash -lc '
+            /bin/bash -c '
               set -euxo pipefail
-              cd /code
-              pwd
+              printf "cwd="; pwd
               ls -la | head -40
               test -f Makefile
-              go version
-              rustup show
-              command -v sgx-detect
-              # The bind mount is owned by the hosted runner UID, while this
-              # container runs as root. Trust the checked-out source directory
-              # so Go's VCS stamping can execute git status during the build.
-              git config --global --add safe.directory /code
-              test -r /code/Makefile
-              stat /code/Makefile
-              make -C /code -f /code/Makefile
+              make -f Makefile
               unset OASIS_TEE_HARDWARE
-              make -C /code -f /code/Makefile test-e2e 2>&1 | tee /tmp/oasis-non-sgx-e2e.log
+              make -f Makefile test-e2e 2>&1 | tee /tmp/oasis-non-sgx-e2e.log
             '
 
       - name: Upload non-SGX E2E logs
