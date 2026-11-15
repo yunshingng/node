@@ -171,7 +171,7 @@ SQL
   docker logs "$container" >>result-optname.log 2>&1 || true
   cat result-optname.log
   if grep -Fq "CONNECT_FMT_PROBE" result-optname.log && [[ "$running" == "true" ]]; then
-    echo "PASS: OPTNAME path reached the CONNECT format-string call ($name)"
+    echo "PASS: OPTNAME path reached the CONNECT format-string call"
   else
     echo "FAIL: OPTNAME path did not reach the instrumented formatter" >&2
     failures=$((failures + 1))
