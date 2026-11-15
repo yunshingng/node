@@ -1,0 +1,42 @@
+name: Oasis ROFL expired top-up PoC
+
+on:
+  push:
+    branches:
+      - "poc/oasis-rofl-expired-topup"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-poc:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout PoC harness
+        uses: actions/checkout@v4
+
+      - name: Checkout affected Oasis SDK revision
+        uses: actions/checkout@v4
+        with:
+          repository: oasisprotocol/oasis-sdk
+          ref: beae84eac81e67a5134825eb192496c5af079cae
+          path: oasis-sdk
+
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang libclang-dev libssl-dev pkg-config protobuf-compiler
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install nightly-2026-08-16 --profile minimal --component rustfmt --component clippy
+          rustup target add --toolchain nightly-2026-08-16 wasm32-unknown-unknown
+          rustup default nightly-2026-08-16
+
+      - name: Run real ROFL Market runtime PoC
+        run: node security-pocs/oasis-rofl-expired-topup/run.mjs oasis-sdk
+        env:
+          LIBCLANG_PATH: /usr/lib/llvm-21/lib
+          CARGO_TERM_COLOR: always
