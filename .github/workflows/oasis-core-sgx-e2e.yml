@@ -11,7 +11,9 @@ permissions:
 
 concurrency:
   group: oasis-core-sgx-e2e-${{ github.ref }}
-  cancel-in-progress: false
+  # New commits replace stale queued runs, preventing an orphaned SGX job
+  # from blocking the hosted baseline job for the same branch.
+  cancel-in-progress: true
 
 jobs:
   non-sgx-e2e:
