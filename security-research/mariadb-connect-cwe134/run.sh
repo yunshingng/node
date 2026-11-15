@@ -91,6 +91,15 @@ SQL
       echo "FAIL: expected variadic argument probe result ($name)" >&2
       failures=$((failures + 1))
     fi
+  elif [[ "$expectation" == "arg-write" ]]; then
+    if grep -Fq "CONNECT_FMT_PROBE" "$log_file" && \
+       grep -Fq "CONNECT_MEM arg11" "$log_file" && \
+       grep -Fq "CONNECT_MEM arg32" "$log_file" && [[ "$running" == "true" ]]; then
+      echo "PASS: positional %hhn write executed in disposable MariaDB process ($name)"
+    else
+      echo "FAIL: expected isolated positional %hhn write result ($name)" >&2
+      failures=$((failures + 1))
+    fi
   elif [[ "$expectation" == "fortify-abort" ]]; then
     if grep -Fq "*** %n in writable segment detected ***" "$log_file" && \
        grep -Fq "__snprintf_chk" "$log_file" && [[ "$running" == "false" ]]; then
@@ -108,6 +117,7 @@ SQL
 run_case baseline "ordinary.csv" normal
 run_case extra-s "d_%s%s%s%s.csv" normal
 run_case arg-probe 'PROBE_%1$p_%2$p_%3$p_%4$p_%5$p_%6$p_%7$p_%8$p_%9$p_%10$p_%11$p_%12$p.csv' arg-probe
+run_case arg-write 'PROBE_%11$hhn.csv' arg-write
 run_case percent-n "d_%n.csv" fortify-abort
 
 if [[ "$failures" -ne 0 ]]; then
