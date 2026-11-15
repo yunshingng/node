@@ -12,6 +12,7 @@ failures=0
 run_case() {
   local name="$1"
   local filename="$2"
+  local expectation="$3"
   local container="connect-cwe134-${name}-$$"
   local log_file="result-${name}.log"
   local sql_file
@@ -40,8 +41,6 @@ SQL
     "$image_tag" >/dev/null
 
   local ready=0
-  # The official image briefly starts a socket-only temporary server while
-  # initializing users. Require TCP readiness to avoid racing that phase.
   for _ in $(seq 1 90); do
     if docker exec "$container" mariadb-admin --protocol=tcp -h127.0.0.1 \
       -uroot -ptest-only-password ping --silent >/dev/null 2>&1; then
@@ -68,36 +67,43 @@ SQL
     -uroot -ptest-only-password --show-warnings <"$sql_file" >"$log_file" 2>&1
   local sql_rc=$?
   set -e
-  echo "sql_exit_code=$sql_rc" | tee -a "$log_file"
 
   sleep 2
   local running
   running="$(docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null || echo missing)"
+  echo "sql_exit_code=$sql_rc" | tee -a "$log_file"
   echo "container_running_after_test=$running" | tee -a "$log_file"
   docker logs "$container" >>"$log_file" 2>&1 || true
   cat "$log_file"
 
-  if [[ "$sql_rc" -ne 0 ]]; then
-    echo "FAIL: SQL test did not complete for $name" >&2
-    failures=$((failures + 1))
-  elif ! grep -q $'1\tprobe' "$log_file"; then
-    echo "FAIL: expected row was not returned for $name" >&2
-    failures=$((failures + 1))
-  else
-    echo "PASS: SQL completed and returned expected row for $name"
+  if [[ "$expectation" == "normal" ]]; then
+    if [[ "$sql_rc" -eq 0 ]] && grep -q $'1\tprobe' "$log_file" && [[ "$running" == "true" ]]; then
+      echo "PASS: SQL completed, returned expected row, server remained alive ($name)"
+    else
+      echo "FAIL: expected normal completion and live server ($name)" >&2
+      failures=$((failures + 1))
+    fi
+  elif [[ "$expectation" == "fortify-abort" ]]; then
+    if grep -Fq "*** %n in writable segment detected ***" "$log_file" && \
+       grep -Fq "__snprintf_chk" "$log_file" && [[ "$running" == "false" ]]; then
+      echo "PASS: %n reached fortified snprintf and aborted the server ($name)"
+    else
+      echo "FAIL: expected fortified %n abort was not observed ($name)" >&2
+      failures=$((failures + 1))
+    fi
   fi
 
   docker rm -f "$container" >/dev/null 2>&1 || true
   rm -f "$sql_file"
 }
 
-run_case baseline "ordinary.csv"
-run_case extra-s "d_%s%s%s%s.csv"
-run_case percent-n "d_%n.csv"
+run_case baseline "ordinary.csv" normal
+run_case extra-s "d_%s%s%s%s.csv" normal
+run_case percent-n "d_%n.csv" fortify-abort
 
 if [[ "$failures" -ne 0 ]]; then
   echo "Validation harness had $failures failed case(s)." >&2
   exit 1
 fi
 
-echo "All SQL cases completed. This is not, by itself, proof of exploitability."
+echo "All expected outcomes observed. The %n case demonstrates a process abort, not RCE."
