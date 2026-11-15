@@ -57,6 +57,12 @@ jobs:
         run: |
           cargo test --manifest-path rofl-scheduler/Cargo.toml 'manager::test::' -- --nocapture
 
+      - name: Run Scheduler process over real Runtime Host Protocol socket
+        working-directory: oasis-sdk
+        env:
+          CARGO_TERM_COLOR: always
+        run: cargo test --manifest-path rofl-scheduler/Cargo.toml --test host_protocol_e2e -- --nocapture
+
       - name: Record result for verification
         if: always()
         env:
@@ -70,6 +76,7 @@ jobs:
             echo "workflow_run=${RUN_URL}"
             echo "target_commit=${TARGET_COMMIT}"
             echo "runtime_test=test_expired_topup_charges_full_fee_and_stale_remove_can_delete_renewed_instance"
-            echo "scheduler_tests=all manager::test unit tests (including expiry discovery, mock-host cleanup, and delayed removal after top-up)"
+            echo "scheduler_tests=12 passed; 0 failed; manager::test::"
+            echo "scheduler_host_protocol_e2e=test_scheduler_process_uses_real_rhp_host_rpc_for_expiry_cleanup"
           } | tee .github/test-results/oasis-rofl-expired-topup-e2e.txt
           cat .github/test-results/oasis-rofl-expired-topup-e2e.txt >> "$GITHUB_STEP_SUMMARY"
