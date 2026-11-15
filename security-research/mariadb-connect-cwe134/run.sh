@@ -16,7 +16,6 @@ run_case() {
   local sql_file
   sql_file="$(mktemp)"
   cat >"$sql_file" <<SQL
-INSTALL SONAME 'ha_connect';
 SELECT VERSION() AS mariadb_version;
 SELECT PLUGIN_NAME, PLUGIN_STATUS FROM information_schema.PLUGINS
  WHERE PLUGIN_NAME = 'CONNECT';
