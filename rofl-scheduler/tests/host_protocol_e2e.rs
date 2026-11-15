@@ -89,7 +89,7 @@ fn scheduler_process_uses_real_rhp_host_rpc_for_expiry_cleanup() -> anyhow::Resu
     // Perform the real Runtime Host Protocol initialization handshake.
     write_message(
         &mut stream,
-        &Message {
+        Message {
             id: 1,
             message_type: MessageType::Request,
             body: Body::RuntimeInfoRequest(RuntimeInfoRequest {
