@@ -27,7 +27,7 @@ impl Drop for ChildGuard {
     }
 }
 
-fn write_message(stream: &mut UnixStream, message: &Message) -> anyhow::Result<()> {
+fn write_message(stream: &mut UnixStream, message: Message) -> anyhow::Result<()> {
     let payload = cbor::to_vec(message);
     let length: u32 = payload.len().try_into()?;
     stream.write_all(&length.to_be_bytes())?;
@@ -142,7 +142,7 @@ fn scheduler_process_uses_real_rhp_host_rpc_for_expiry_cleanup() -> anyhow::Resu
                 let response = cbor::to_vec(volume_manager::VolumeRemoveResponse {});
                 write_message(
                     &mut stream,
-                    &Message {
+                    Message {
                         id: request_message.id,
                         message_type: MessageType::Response,
                         body: Body::HostRPCCallResponse {
@@ -162,7 +162,7 @@ fn scheduler_process_uses_real_rhp_host_rpc_for_expiry_cleanup() -> anyhow::Resu
                 let response = cbor::to_vec(bundle_manager::BundleRemoveResponse {});
                 write_message(
                     &mut stream,
-                    &Message {
+                    Message {
                         id: request_message.id,
                         message_type: MessageType::Response,
                         body: Body::HostRPCCallResponse {
