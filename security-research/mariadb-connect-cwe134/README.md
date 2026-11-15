@@ -16,7 +16,7 @@ Requirements: Docker Engine and Docker Compose v2.
 
 ```sh
 cd security-research/mariadb-connect-cwe134
-./run.sh
+bash run.sh
 ```
 
 The runner creates a disposable MariaDB container, installs/loads CONNECT if the image package provides it, and runs one test case per fresh server container. A crashing server is recorded as a result rather than treated as a successful exploit.
