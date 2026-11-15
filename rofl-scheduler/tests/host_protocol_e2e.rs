@@ -62,9 +62,9 @@ fn scheduler_process_uses_real_rhp_host_rpc_for_expiry_cleanup() -> anyhow::Resu
         .env("ROFL_SCHEDULER_HOST_E2E", "1")
         // Expiry snapshot was captured before the top-up. At execution time the
         // renewed lease is valid, but the production stop path still uses snapshot.
-        .env("ROFL_SCHEDULER_PAID_UNTIL_SNAPSHOT", "1000")
-        .env("ROFL_SCHEDULER_NOW", "3400")
-        .env("ROFL_SCHEDULER_RENEWED_PAID_UNTIL", "5185000")
+        .env("ROFL_SCHEDULER_PAID_UNTIL_SNAPSHOT", "1744370021")
+        .env("ROFL_SCHEDULER_NOW", "1744372421")
+        .env("ROFL_SCHEDULER_RENEWED_PAID_UNTIL", "1749554021")
         .stdin(Stdio::null())
         .stdout(Stdio::from(child_log.try_clone()?))
         .stderr(Stdio::from(child_log))

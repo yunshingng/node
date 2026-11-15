@@ -49,7 +49,7 @@ jobs:
         working-directory: oasis-sdk
         env:
           CARGO_TERM_COLOR: always
-        run: cargo test --manifest-path runtime-sdk/modules/rofl-market/Cargo.toml test_expired_topup_charges_full_fee_and_stale_remove_can_delete_renewed_instance -- --nocapture
+        run: cargo test --manifest-path runtime-sdk/modules/rofl-market/Cargo.toml test_expired_topup_charges_full_fee_and_claims_expired_gap -- --nocapture
 
       - name: Run Scheduler manager and mock-host lifecycle tests
         working-directory: oasis-sdk
@@ -78,8 +78,8 @@ jobs:
             echo "job_status=${JOB_STATUS}"
             echo "workflow_run=${RUN_URL}"
             echo "target_commit=${TARGET_COMMIT}"
-            echo "runtime_test=test_expired_topup_charges_full_fee_and_stale_remove_can_delete_renewed_instance"
-            echo "scheduler_tests=12 passed; 0 failed; manager::test::"
-            echo "scheduler_host_protocol_e2e=test_scheduler_process_uses_real_rhp_host_rpc_for_expiry_cleanup"
+            echo "runtime_test=test_expired_topup_charges_full_fee_and_claims_expired_gap"
+            echo "scheduler_tests=manager::test:: suite passed; see CI log for exact count"
+            echo "scheduler_host_protocol_e2e=test_scheduler_process_uses_real_rhp_host_rpc_for_expiry_cleanup (simulated Host backend)"
           } | tee .github/test-results/oasis-rofl-expired-topup-e2e.txt
           cat .github/test-results/oasis-rofl-expired-topup-e2e.txt >> "$GITHUB_STEP_SUMMARY"
