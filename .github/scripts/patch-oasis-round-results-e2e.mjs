@@ -16,6 +16,7 @@ const regressionTest = String.raw`
     // Exercises the actual SDK block-begin message-result dispatcher.
     // The consensus MKVS is fixed to a failed staking transfer (code=1), while
     // the independently supplied RuntimeBatchContext.round_results can be changed.
+    type RoundResultsAccounts = Accounts;
     type RoundResultsConsensus = crate::modules::consensus::Module;
     type RoundResultsConsensusAccounts =
         crate::modules::consensus_accounts::Module<RoundResultsConsensus>;
