@@ -98,7 +98,7 @@ if (!managerSource.includes("async fn stop_instance_host_resources")) {
 }
 
 const oldExpiry = [
-  "            if instance_expired(instance.paid_until, now) {",
+  "            if instance.paid_until < now {",
   "                slog::info!(self.logger, \"instance not paid for, stopping\";",
   "                    \"id\" => ?instance.id,",
   "                );",
