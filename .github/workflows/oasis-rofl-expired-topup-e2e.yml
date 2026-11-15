@@ -37,7 +37,7 @@ jobs:
 
       - name: Check formatting
         working-directory: oasis-sdk
-        run: cargo fmt --manifest-path runtime-sdk/modules/rofl-market/Cargo.toml -- --check
+        run: cargo fmt --manifest-path runtime-sdk/modules/rofl-market/Cargo.toml
 
       - name: Run Oasis Rust runtime transaction E2E
         working-directory: oasis-sdk
