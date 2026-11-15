@@ -108,7 +108,7 @@ SQL
 
 run_case baseline "ordinary.csv" normal
 run_case extra-s "d_%s%s%s%s.csv" normal
-run_case arg-probe "PROBE_%1$p_%2$p_%3$p_%4$p_%5$p_%6$p_%7$p_%8$p_%9$p_%10$p_%11$p_%12$p.csv" arg-probe
+run_case arg-probe 'PROBE_%1$p_%2$p_%3$p_%4$p_%5$p_%6$p_%7$p_%8$p_%9$p_%10$p_%11$p_%12$p.csv' arg-probe
 run_case percent-n "d_%n.csv" fortify-abort
 
 if [[ "$failures" -ne 0 ]]; then
