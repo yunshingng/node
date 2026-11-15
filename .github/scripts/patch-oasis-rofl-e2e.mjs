@@ -149,7 +149,7 @@ const newRemoval = [
   "        if !removed {",
   "            return Ok(());",
   "        }",
-].join("\\n");
+].join("\n");
 if (managerSource.includes(oldRemoval)) {
   managerSource = managerSource.replace(oldRemoval, newRemoval);
 } else if (!managerSource.includes("if !removal_delay_elapsed(now, ts, max_delta)")) {
