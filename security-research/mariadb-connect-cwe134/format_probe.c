@@ -44,13 +44,12 @@ static void emit_map_and_memory(uintptr_t value, unsigned index) {
   }
   fclose(fp);
   if (!writable) return;
-  int mem = open("/proc/self/mem", O_RDONLY);
-  if (mem < 0) return;
   unsigned char bytes[96];
   uintptr_t start = value >= lo + 32 ? value - 32 : lo;
   size_t want = sizeof(bytes);
   if (start + want > hi) want = hi - start;
-  ssize_t got = pread(mem, bytes, want, (off_t)start);
+  memcpy(bytes, (const void *)start, want);
+  ssize_t got = (ssize_t)want;
   if (got > 0) {
     char out[1200];
     size_t pos = 0;
@@ -68,7 +67,6 @@ static void emit_map_and_memory(uintptr_t value, unsigned index) {
     out[pos++] = '\n';
     (void)write(STDERR_FILENO, out, pos);
   }
-  close(mem);
 }
 
 __attribute__((constructor))
