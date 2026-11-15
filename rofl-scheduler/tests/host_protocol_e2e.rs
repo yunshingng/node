@@ -48,21 +48,21 @@ fn read_message(stream: &mut UnixStream) -> anyhow::Result<Message> {
 
 #[test]
 fn scheduler_process_uses_real_rhp_host_rpc_for_expiry_cleanup() -> anyhow::Result<()> {
-    let socket_path: PathBuf = std::env::temp_dir().join(format!(
-        "oasis-rofl-scheduler-rhp-{}-{}.sock",
-        std::process::id(),
-        std::thread::current().name().unwrap_or("test")
-    ));
+    let socket_path: PathBuf =
+        std::env::temp_dir().join(format!("oasis-rhp-{}.sock", std::process::id()));
+    let child_log_path: PathBuf =
+        std::env::temp_dir().join(format!("oasis-rhp-{}.log", std::process::id()));
     let _ = fs::remove_file(&socket_path);
     let listener = UnixListener::bind(&socket_path)?;
     listener.set_nonblocking(true)?;
 
+    let child_log = fs::File::create(&child_log_path)?;
     let child = Command::new(env!("CARGO_BIN_EXE_rofl-scheduler"))
         .env("OASIS_WORKER_HOST", &socket_path)
         .env("ROFL_SCHEDULER_HOST_E2E", "1")
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stdout(Stdio::from(child_log.try_clone()?))
+        .stderr(Stdio::from(child_log))
         .spawn()?;
     let mut child = ChildGuard(child);
 
@@ -72,7 +72,10 @@ fn scheduler_process_uses_real_rhp_host_rpc_for_expiry_cleanup() -> anyhow::Resu
             Ok(connection) => break connection,
             Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
                 if let Some(status) = child.0.try_wait()? {
-                    anyhow::bail!("Scheduler process exited before connecting: {status}");
+                    let child_log = fs::read_to_string(&child_log_path).unwrap_or_default();
+                    anyhow::bail!(
+                        "Scheduler process exited before connecting: {status}; child log:\n{child_log}"
+                    );
                 }
                 anyhow::ensure!(
                     started.elapsed() < Duration::from_secs(30),
@@ -191,5 +194,6 @@ fn scheduler_process_uses_real_rhp_host_rpc_for_expiry_cleanup() -> anyhow::Resu
     child.0.kill()?;
     let _ = child.0.wait()?;
     let _ = fs::remove_file(&socket_path);
+    let _ = fs::remove_file(&child_log_path);
     Ok(())
 }
