@@ -38,5 +38,5 @@ jobs:
       - name: Run real ROFL Market runtime PoC
         run: node security-pocs/oasis-rofl-expired-topup/run.mjs oasis-sdk
         env:
-          LIBCLANG_PATH: /usr/lib/llvm-21/lib
           CARGO_TERM_COLOR: always
+          RUSTFLAGS: -C target-feature=+aes,+ssse3
