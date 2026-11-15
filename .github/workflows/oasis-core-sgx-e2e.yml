@@ -56,8 +56,8 @@ jobs:
               go version
               rustup show
               command -v sgx-detect
-              cargo install sgxs-tools --locked
-              cargo elf2sgxs --help >/dev/null
+              # 'cargo elf2sgxs' is installed by Oasis Core's own
+              # 'make build-tools' target; do not check it before 'make'.
               make
               unset OASIS_TEE_HARDWARE
               make test-e2e 2>&1 | tee /tmp/oasis-non-sgx-e2e.log
