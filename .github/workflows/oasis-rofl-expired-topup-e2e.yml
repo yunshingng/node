@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/scripts/patch-oasis-rofl-e2e.mjs'
       - '.github/workflows/oasis-rofl-expired-topup-e2e.yml'
+      - 'rofl-scheduler/tests/host_protocol_e2e.rs'
 
 permissions:
   contents: write
