@@ -1,0 +1,27 @@
+name: MariaDB CONNECT CWE-134 validation
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "security-research/mariadb-connect-cwe134/**"
+      - ".github/workflows/mariadb-connect-cwe134.yml"
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and run isolated MariaDB tests
+        working-directory: security-research/mariadb-connect-cwe134
+        run: |
+          chmod +x run.sh
+          ./run.sh
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mariadb-connect-cwe134-logs
+          path: security-research/mariadb-connect-cwe134/result-*.log
+          if-no-files-found: warn
