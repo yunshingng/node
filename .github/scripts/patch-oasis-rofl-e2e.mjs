@@ -510,6 +510,27 @@ if (processorSource.includes(processorAnchor)) {
 fs.writeFileSync(processorFile, processorSource);
 
 
+
+const schedulerCargoFile = file.replace(
+  "runtime-sdk/modules/rofl-market/src/test.rs",
+  "rofl-scheduler/Cargo.toml",
+);
+let schedulerCargo = fs.readFileSync(schedulerCargoFile, "utf8");
+// The test runner has no TDX device. Build the same Scheduler source in native
+// (TEE=None) mode so it can connect to the RHP Unix socket and exercise host RPC.
+schedulerCargo = schedulerCargo.replace(
+  'oasis-runtime-sdk = { path = "../runtime-sdk", features = ["tdx"] }',
+  'oasis-runtime-sdk = { path = "../runtime-sdk" }',
+);
+schedulerCargo = schedulerCargo.replace(
+  'rofl-app-core = { path = "../rofl-app-core", features = ["tdx"] }',
+  'rofl-app-core = { path = "../rofl-app-core" }',
+);
+if (schedulerCargo.includes('features = ["tdx"]')) {
+  throw new Error("Failed to disable TDX-only build requirements for native RHP integration test.");
+}
+fs.writeFileSync(schedulerCargoFile, schedulerCargo);
+
 const hostProtocolTestSource = "rofl-scheduler/tests/host_protocol_e2e.rs";
 const hostProtocolTestTarget = file.replace(
   "runtime-sdk/modules/rofl-market/src/test.rs",
