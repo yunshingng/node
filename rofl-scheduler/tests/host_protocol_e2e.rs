@@ -122,8 +122,9 @@ fn scheduler_process_uses_real_rhp_host_rpc_for_expiry_cleanup() -> anyhow::Resu
     let mut bundle_labels = None;
     let mut volume_exists = true;
 
-    // The Scheduler process is given an expiry snapshot (1000) and a current time (3400),
-    // while its renewed paid_until (5185000) is in the future. It nevertheless executes cleanup.
+    // The Scheduler process uses the Runtime PoC's exact fixture:
+    // expiry 1,744,370,021; top-up time 1,744,372,421; renewed paid_until 1,749,554,021.
+    // The renewed lease is valid when the previously queued stop is dispatched.
     // The process invokes Host::volume_manager().volume_remove() first,
     // then Host::bundle_manager().bundle_remove(). These are actual RHP messages over
     // the Unix socket, not calls to a Rust trait mock.
