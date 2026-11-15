@@ -35,6 +35,8 @@ jobs:
         run: |
           set -euxo pipefail
           docker pull ghcr.io/oasisprotocol/oasis-core-dev:master
+          test -f "$GITHUB_WORKSPACE/oasis-core/Makefile"
+          ls -la "$GITHUB_WORKSPACE/oasis-core" | head -40
           mkdir -p "$RUNNER_TEMP/oasis-tmp"
 
       - name: Build and run non-SGX E2E in official dev container
@@ -53,11 +55,13 @@ jobs:
             ghcr.io/oasisprotocol/oasis-core-dev:master \
             bash -lc '
               set -euxo pipefail
+              cd /code
+              pwd
+              ls -la | head -40
+              test -f Makefile
               go version
               rustup show
               command -v sgx-detect
-              # 'cargo elf2sgxs' is installed by Oasis Core's own
-              # 'make build-tools' target; do not check it before 'make'.
               make
               unset OASIS_TEE_HARDWARE
               make test-e2e 2>&1 | tee /tmp/oasis-non-sgx-e2e.log
