@@ -128,7 +128,7 @@ CREATE TABLE t_optprobe (
   id INT,
   v VARCHAR(32)
 ) ENGINE=CONNECT TABLE_TYPE=CSV
-  OPTNAME='PROBE_%1$p_%2$p_%3$p_%4$p_%5$p_%6$p_%7$p_%8$p_%9$p_%10$p_%11$p_%12$p.csv'
+  XFILE_NAME='PROBE_%1$p_%2$p_%3$p_%4$p_%5$p_%6$p_%7$p_%8$p_%9$p_%10$p_%11$p_%12$p.csv'
 PARTITION BY RANGE(id) (
   PARTITION p0 VALUES LESS THAN (10),
   PARTITION p1 VALUES LESS THAN MAXVALUE
