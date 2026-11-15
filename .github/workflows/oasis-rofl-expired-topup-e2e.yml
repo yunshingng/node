@@ -54,7 +54,8 @@ jobs:
         working-directory: oasis-sdk
         env:
           CARGO_TERM_COLOR: always
-        run: |\n          cargo test --manifest-path rofl-scheduler/Cargo.toml 'manager::test::' -- --nocapture
+        run: |
+          cargo test --manifest-path rofl-scheduler/Cargo.toml 'manager::test::' -- --nocapture
 
       - name: Record result for verification
         if: always()
