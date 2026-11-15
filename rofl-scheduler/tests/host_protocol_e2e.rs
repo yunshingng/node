@@ -60,6 +60,11 @@ fn scheduler_process_uses_real_rhp_host_rpc_for_expiry_cleanup() -> anyhow::Resu
     let child = Command::new(env!("CARGO_BIN_EXE_rofl-scheduler"))
         .env("OASIS_WORKER_HOST", &socket_path)
         .env("ROFL_SCHEDULER_HOST_E2E", "1")
+        // Expiry snapshot was captured before the top-up. At execution time the
+        // renewed lease is valid, but the production stop path still uses snapshot.
+        .env("ROFL_SCHEDULER_PAID_UNTIL_SNAPSHOT", "1000")
+        .env("ROFL_SCHEDULER_NOW", "3400")
+        .env("ROFL_SCHEDULER_RENEWED_PAID_UNTIL", "5185000")
         .stdin(Stdio::null())
         .stdout(Stdio::from(child_log.try_clone()?))
         .stderr(Stdio::from(child_log))
@@ -115,8 +120,11 @@ fn scheduler_process_uses_real_rhp_host_rpc_for_expiry_cleanup() -> anyhow::Resu
     let mut observed = Vec::new();
     let mut volume_labels = None;
     let mut bundle_labels = None;
+    let mut volume_exists = true;
 
-    // The real Scheduler process invokes Host::volume_manager().volume_remove() first,
+    // The Scheduler process is given an expiry snapshot (1000) and a current time (3400),
+    // while its renewed paid_until (5185000) is in the future. It nevertheless executes cleanup.
+    // The process invokes Host::volume_manager().volume_remove() first,
     // then Host::bundle_manager().bundle_remove(). These are actual RHP messages over
     // the Unix socket, not calls to a Rust trait mock.
     for expected in ["volume-manager", "bundle-manager"] {
@@ -142,6 +150,8 @@ fn scheduler_process_uses_real_rhp_host_rpc_for_expiry_cleanup() -> anyhow::Resu
                     "VolumeRemove did not target a specific ROFL instance"
                 );
                 volume_labels = Some(args.labels);
+                // The test host models the persistent volume and applies the real RPC.
+                volume_exists = false;
                 let response = cbor::to_vec(volume_manager::VolumeRemoveResponse {});
                 write_message(
                     &mut stream,
@@ -184,6 +194,7 @@ fn scheduler_process_uses_real_rhp_host_rpc_for_expiry_cleanup() -> anyhow::Resu
         observed == ["volume-manager.VolumeRemove", "bundle-manager.BundleRemove"],
         "Scheduler did not make the expected host cleanup calls: {observed:?}"
     );
+    anyhow::ensure!(!volume_exists, "expired cleanup must delete the still-existing volume after renewal");
     anyhow::ensure!(
         volume_labels == bundle_labels,
         "volume and bundle cleanup used different instance labels"
