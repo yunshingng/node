@@ -85,6 +85,17 @@ int __snprintf_chk(char *dst, size_t maxlen, int flag, size_t objsize,
     size_t pos = 0;
     va_copy(scan, ap);
     pos = append_text(line, pos, "CONNECT_FMT_PROBE");
+    Dl_info caller_info;
+    if (dladdr(__builtin_return_address(0), &caller_info)) {
+      char caller[512];
+      int caller_len = snprintf(caller, sizeof(caller),
+                                " caller=%s symbol=%s offset=%p",
+                                caller_info.dli_fname ? caller_info.dli_fname : "?",
+                                caller_info.dli_sname ? caller_info.dli_sname : "?",
+                                (void *)((uintptr_t)__builtin_return_address(0) -
+                                         (uintptr_t)caller_info.dli_fbase));
+      if (caller_len > 0) pos = append_text(line, pos, caller);
+    }
     for (unsigned i = 0; i < 12; ++i) {
       values[i] = va_arg(scan, uintptr_t);
       pos = append_text(line, pos, " arg");
