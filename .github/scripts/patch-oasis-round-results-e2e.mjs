@@ -73,7 +73,6 @@ const regressionTest = String.raw`
             storage::mkvs::{self, MKVS as _},
         };
         use crate::{
-            modules::accounts::API as _,
             state::{CurrentState, Options, TransactionResult},
             storage::MKVSStore,
             testing::mock::Mock,
@@ -191,7 +190,7 @@ const regressionTest = String.raw`
         // Commit and hash the post-execution Runtime state.
         drop(runtime_store);
         let (_write_log, runtime_state_root) = runtime_overlay
-            .commit(Namespace::default(), 2)
+            .commit_both(Namespace::default(), 2)
             .expect("commit post-execution Runtime MKVS");
 
         // The authenticated consensus value must remain unchanged by Runtime execution.
