@@ -85,7 +85,14 @@ SQL
       failures=$((failures + 1))
     fi
   elif [[ "$expectation" == "arg-probe" ]]; then
-    if [[ "$sql_rc" -eq 0 ]] && grep -q 
+    if [[ "$sql_rc" -eq 0 ]] && grep -q $'1\tprobe' "$log_file" && \
+       grep -Fq "CONNECT_FMT_PROBE" "$log_file" && [[ "$running" == "true" ]]; then
+      echo "PASS: captured real MariaDB CONNECT variadic argument slots ($name)"
+    else
+      echo "FAIL: expected variadic argument probe result ($name)" >&2
+      failures=$((failures + 1))
+    fi
+  elif [[ "$expectation" == "fortify-abort" ]]; then
     if grep -Fq "*** %n in writable segment detected ***" "$log_file" && \
        grep -Fq "__snprintf_chk" "$log_file" && [[ "$running" == "false" ]]; then
       echo "PASS: %n reached fortified snprintf and aborted the server ($name)"
@@ -109,35 +116,4 @@ if [[ "$failures" -ne 0 ]]; then
   exit 1
 fi
 
-echo "All expected outcomes observed. The %n case demonstrates a process abort, not RCE."
-1\tprobe' "$log_file" && \
-       grep -Fq "CONNECT_FMT_PROBE" "$log_file" && [[ "$running" == "true" ]]; then
-      echo "PASS: captured real MariaDB CONNECT variadic argument slots ($name)"
-    else
-      echo "FAIL: expected variadic argument probe result ($name)" >&2
-      failures=$((failures + 1))
-    fi
-  elif [[ "$expectation" == "fortify-abort" ]]; then
-    if grep -Fq "*** %n in writable segment detected ***" "$log_file" && \
-       grep -Fq "__snprintf_chk" "$log_file" && [[ "$running" == "false" ]]; then
-      echo "PASS: %n reached fortified snprintf and aborted the server ($name)"
-    else
-      echo "FAIL: expected fortified %n abort was not observed ($name)" >&2
-      failures=$((failures + 1))
-    fi
-  fi
-
-  docker rm -f "$container" >/dev/null 2>&1 || true
-  rm -f "$sql_file"
-}
-
-run_case baseline "ordinary.csv" normal
-run_case extra-s "d_%s%s%s%s.csv" normal
-run_case percent-n "d_%n.csv" fortify-abort
-
-if [[ "$failures" -ne 0 ]]; then
-  echo "Validation harness had $failures failed case(s)." >&2
-  exit 1
-fi
-
-echo "All expected outcomes observed. The %n case demonstrates a process abort, not RCE."
+echo "All expected outcomes observed. The probe reports raw slots; it does not claim RCE."
