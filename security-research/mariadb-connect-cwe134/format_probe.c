@@ -35,7 +35,7 @@ static void emit_map_and_memory(uintptr_t value, unsigned index) {
   while (fgets(line, sizeof(line), fp)) {
     unsigned long a = 0, b = 0;
     if (sscanf(line, "%lx-%lx", &a, &b) == 2 && value >= a && value < b) {
-      lo = a; hi = b; writable = line[18] == 'w';
+      lo = a; hi = b; char *perms = strchr(line, ' '); writable = perms && perms[2] == 'w';
       char out[1200];
       int n = snprintf(out, sizeof(out), "CONNECT_MAP arg%u=%s", index, line);
       if (n > 0) (void)write(STDERR_FILENO, out, (size_t)n);
@@ -101,6 +101,8 @@ int __snprintf_chk(char *dst, size_t maxlen, int flag, size_t objsize,
     for (unsigned i = 0; i < 12; ++i)
       if (values[i]) emit_map_and_memory(values[i], i + 1);
     int result = vsnprintf(dst, maxlen, format, ap);
+    for (unsigned i = 0; i < 12; ++i)
+      if (values[i]) emit_map_and_memory(values[i], i + 21);
     va_end(ap);
     return result;
   }
