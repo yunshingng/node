@@ -26,6 +26,10 @@ let managerSource = fs.readFileSync(managerFile, "utf8");
 const helperAnchor = "impl Manager {\n";
 const managerHelpers = [
   "#[derive(Clone, Copy, Debug, PartialEq, Eq)]",
+  "fn instance_expired(paid_until: u64, now: u64) -> bool {",
+  "    paid_until < now",
+  "}",
+  "",
   "struct ExpiredInstanceActions {",
   "    stop_running: bool,",
   "    removal_timestamp: u64,",
@@ -36,7 +40,7 @@ const managerHelpers = [
   "    now: u64,",
   "    is_running: bool,",
   ") -> Option<ExpiredInstanceActions> {",
-  "    (paid_until < now).then_some(ExpiredInstanceActions {",
+  "    instance_expired(paid_until, now).then_some(ExpiredInstanceActions {",
   "        stop_running: is_running,",
   "        removal_timestamp: paid_until,",
   "    })",
@@ -94,7 +98,7 @@ if (!managerSource.includes("async fn stop_instance_host_resources")) {
 }
 
 const oldExpiry = [
-  "            if instance.paid_until < now {",
+  "            if instance_expired(instance.paid_until, now) {",
   "                slog::info!(self.logger, \"instance not paid for, stopping\";",
   "                    \"id\" => ?instance.id,",
   "                );",
@@ -438,8 +442,11 @@ const hostE2EFlag = "ROFL_SCHEDULER_HOST_E2E";
 
 const managerProbeAnchor = "    /// Main loop of the ROFL scheduler.\n";
 const managerProbe = [
-    "    /// Run the production host cleanup path from the isolated RHP integration harness.",
-    "    pub(crate) async fn host_cleanup_e2e(self: Arc<Self>) -> Result<()> {",
+    "    /// Reproduce the expiry-snapshot race after a successful top-up.",
+    "    pub(crate) async fn host_cleanup_e2e(self: Arc<Self>, paid_until_snapshot: u64, now: u64, renewed_paid_until: u64) -> Result<()> {",
+    "        anyhow::ensure!(renewed_paid_until > now, \"fixture must represent a successfully renewed lease\");",
+    "        if !instance_expired(paid_until_snapshot, now) { return Ok(()); }",
+    "        // Production discover() queues this stop from the expiry snapshot; stop_instance() does not re-query paid_until.",
     "        self.stop_instance(InstanceId::from(4242u64), true).await",
     "    }",
     "",
@@ -482,7 +489,10 @@ const runAnchor = "    async fn run(self: Arc<Self>, env: Environment<Self>) {\n
 const runReplacement = runAnchor + [
     "        if std::env::var_os(\"" + hostE2EFlag + "\").is_some() {",
     "            let manager = manager::Manager::new(env, cfg.clone(), None);",
-    "            manager.host_cleanup_e2e().await.expect(\"Scheduler host cleanup probe failed\");",
+        "            let paid_until_snapshot: u64 = std::env::var(\"ROFL_SCHEDULER_PAID_UNTIL_SNAPSHOT\").unwrap().parse().unwrap();",
+    "            let now: u64 = std::env::var(\"ROFL_SCHEDULER_NOW\").unwrap().parse().unwrap();",
+    "            let renewed_paid_until: u64 = std::env::var(\"ROFL_SCHEDULER_RENEWED_PAID_UNTIL\").unwrap().parse().unwrap();",
+    "            manager.host_cleanup_e2e(paid_until_snapshot, now, renewed_paid_until).await.expect(\"Scheduler expiry/top-up race cleanup probe failed\");",
     "            return;",
     "        }",
 ].join("\n") + "\n";
