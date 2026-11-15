@@ -433,4 +433,80 @@ if (!managerSource.includes("test_expired_scheduler_host_cleanup_wipes_volume_th
 }
 fs.writeFileSync(managerFile, managerSource);
 
+
+const hostE2EFlag = "ROFL_SCHEDULER_HOST_E2E";
+
+const managerProbeAnchor = "    /// Main loop of the ROFL scheduler.\n";
+const managerProbe = [
+    "    /// Run the production host cleanup path from the isolated RHP integration harness.",
+    "    pub(crate) async fn host_cleanup_e2e(self: Arc<Self>) -> Result<()> {",
+    "        self.stop_instance(InstanceId::from(4242u64), true).await",
+    "    }",
+    "",
+].join("\n");
+if (!managerSource.includes("pub(crate) async fn host_cleanup_e2e")) {
+    if (!managerSource.includes(managerProbeAnchor)) throw new Error("Cannot locate manager probe insertion point.");
+    managerSource = managerSource.replace(managerProbeAnchor, managerProbe + managerProbeAnchor);
+}
+fs.writeFileSync(managerFile, managerSource);
+
+const mainFile = file.replace("runtime-sdk/modules/rofl-market/src/test.rs", "rofl-scheduler/src/main.rs");
+let mainSource = fs.readFileSync(mainFile, "utf8");
+const initAnchor = "    fn init(&mut self, host: Arc<Protocol>) {\n        let logger = get_logger(\"scheduler\");\n";
+const initReplacement = [
+    "    fn init(&mut self, host: Arc<Protocol>) {",
+    "        if std::env::var_os(\"" + hostE2EFlag + "\").is_some() {",
+    "            self.cfg = Some(Arc::new(config::LocalConfig {",
+    "                provider_address: oasis_runtime_sdk::types::address::Address::default(),",
+    "                offers: Default::default(),",
+    "                capacity: config::Resources::default(),",
+    "                processing_interval_secs: 1,",
+    "                claim_payment_interval_secs: 24 * 3600,",
+    "                deploy_pull_timeout: 60,",
+    "                transfer_instances_from: Default::default(),",
+    "                api_domain: None,",
+    "                api_token_lifetime: 3600,",
+    "                proxy: None,",
+    "            }));",
+    "            return;",
+    "        }",
+    "        let logger = get_logger(\"scheduler\");",
+].join("\n") + "\n";
+if (mainSource.includes(initAnchor)) {
+    mainSource = mainSource.replace(initAnchor, initReplacement);
+} else if (!mainSource.includes("ROFL_SCHEDULER_HOST_E2E")) {
+    throw new Error("Cannot insert direct host-protocol configuration in SchedulerApp::init.");
+}
+
+const runAnchor = "    async fn run(self: Arc<Self>, env: Environment<Self>) {\n        let logger = get_logger(\"scheduler\");\n        let cfg = self.cfg.as_ref().unwrap();\n";
+const runReplacement = runAnchor + [
+    "        if std::env::var_os(\"" + hostE2EFlag + "\").is_some() {",
+    "            let manager = manager::Manager::new(env, cfg.clone(), None);",
+    "            manager.host_cleanup_e2e().await.expect(\"Scheduler host cleanup probe failed\");",
+    "            return;",
+    "        }",
+].join("\n") + "\n";
+if (mainSource.includes(runAnchor)) {
+    mainSource = mainSource.replace(runAnchor, runReplacement);
+} else if (!mainSource.includes("manager.host_cleanup_e2e()")) {
+    throw new Error("Cannot insert direct host-protocol execution in SchedulerApp::run.");
+}
+fs.writeFileSync(mainFile, mainSource);
+
+const processorFile = file.replace("runtime-sdk/modules/rofl-market/src/test.rs", "rofl-app-core/src/processor.rs");
+let processorSource = fs.readFileSync(processorFile, "utf8");
+const processorAnchor = "        tokio::spawn(processor.run());\n";
+const processorReplacement = [
+    "        if std::env::var_os(\"" + hostE2EFlag + "\").is_some() {",
+    "            tokio::spawn(processor.state.app.clone().run(processor.env.clone()));",
+    "        }",
+    "        tokio::spawn(processor.run());",
+].join("\n") + "\n";
+if (processorSource.includes(processorAnchor)) {
+    processorSource = processorSource.replace(processorAnchor, processorReplacement);
+} else if (!processorSource.includes("processor.state.app.clone().run(processor.env.clone())")) {
+    throw new Error("Cannot insert direct Scheduler app start in ROFL processor.");
+}
+fs.writeFileSync(processorFile, processorSource);
+
 console.log("Injected the isolated runtime regression test and enabled SDK test helpers.");
