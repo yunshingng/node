@@ -25,11 +25,11 @@ let managerSource = fs.readFileSync(managerFile, "utf8");
 
 const helperAnchor = "impl Manager {\n";
 const managerHelpers = [
-  "#[derive(Clone, Copy, Debug, PartialEq, Eq)]",
   "fn instance_expired(paid_until: u64, now: u64) -> bool {",
   "    paid_until < now",
   "}",
   "",
+  "#[derive(Clone, Copy, Debug, PartialEq, Eq)]",
   "struct ExpiredInstanceActions {",
   "    stop_running: bool,",
   "    removal_timestamp: u64,",
