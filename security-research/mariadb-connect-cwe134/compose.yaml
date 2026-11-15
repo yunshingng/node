@@ -1,0 +1,15 @@
+services:
+  mariadb-connect:
+    build:
+      context: .
+      args:
+        MARIADB_IMAGE: ${MARIADB_IMAGE:-mariadb:11.4}
+    environment:
+      MARIADB_ROOT_PASSWORD: test-only-password
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+    tmpfs:
+      - /var/lib/mysql
