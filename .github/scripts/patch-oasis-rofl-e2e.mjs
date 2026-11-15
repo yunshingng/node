@@ -509,4 +509,18 @@ if (processorSource.includes(processorAnchor)) {
 }
 fs.writeFileSync(processorFile, processorSource);
 
+
+const hostProtocolTestSource = "rofl-scheduler/tests/host_protocol_e2e.rs";
+const hostProtocolTestTarget = file.replace(
+  "runtime-sdk/modules/rofl-market/src/test.rs",
+  "rofl-scheduler/tests/host_protocol_e2e.rs",
+);
+if (!fs.existsSync(hostProtocolTestSource)) {
+  throw new Error("RHP integration test source is missing from the harness repository.");
+}
+fs.mkdirSync(hostProtocolTestTarget.slice(0, hostProtocolTestTarget.lastIndexOf("/")), {
+  recursive: true,
+});
+fs.writeFileSync(hostProtocolTestTarget, fs.readFileSync(hostProtocolTestSource, "utf8"));
+
 console.log("Injected the isolated runtime regression test and enabled SDK test helpers.");
