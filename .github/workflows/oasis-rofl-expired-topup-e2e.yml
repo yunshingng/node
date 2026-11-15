@@ -54,7 +54,7 @@ jobs:
         working-directory: oasis-sdk
         env:
           CARGO_TERM_COLOR: always
-        run: cargo test --manifest-path rofl-scheduler/Cargo.toml test_expired_scheduler -- --nocapture
+        run: cargo test --manifest-path rofl-scheduler/Cargo.toml manager::test:: -- --nocapture
 
       - name: Record result for verification
         if: always()
@@ -69,12 +69,6 @@ jobs:
             echo "workflow_run=${RUN_URL}"
             echo "target_commit=${TARGET_COMMIT}"
             echo "runtime_test=test_expired_topup_charges_full_fee_and_stale_remove_can_delete_renewed_instance"
-            echo "scheduler_tests=test_expiry_discovery_queues_wipe_and_delayed_removal_only_when_expired,test_expired_scheduler_host_cleanup_wipes_volume_then_bundle,test_expired_scheduler_without_wipe_preserves_volume_but_removes_bundle,test_stale_removal_delay_is_based_on_expiry_snapshot"
-          } > .github/test-results/oasis-rofl-expired-topup-e2e.txt
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/test-results/oasis-rofl-expired-topup-e2e.txt
-          if ! git diff --cached --quiet; then
-            git commit -m "Record Oasis ROFL runtime E2E result"
-            git push
-          fi
+            echo "scheduler_tests=all manager::test unit tests (including expiry discovery, mock-host cleanup, and delayed removal after top-up)"
+          } | tee .github/test-results/oasis-rofl-expired-topup-e2e.txt
+          cat .github/test-results/oasis-rofl-expired-topup-e2e.txt >> "$GITHUB_STEP_SUMMARY"
