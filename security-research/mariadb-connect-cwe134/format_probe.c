@@ -96,8 +96,23 @@ int __snprintf_chk(char *dst, size_t maxlen, int flag, size_t objsize,
     if (pos < sizeof(line)) line[pos++] = '\n';
     (void)write(STDERR_FILENO, line, pos);
     va_end(scan);
-    for (unsigned i = 0; i < 12; ++i)
-      if (values[i]) emit_map_and_memory(values[i], i + 1);
+    for (unsigned i = 0; i < 12; ++i) {
+      if (!values[i]) continue;
+      emit_map_and_memory(values[i], i + 1);
+      if (i == 4) {
+        uintptr_t first_word = *(const uintptr_t *)values[i];
+        Dl_info info;
+        if (dladdr((void *)first_word, &info)) {
+          char sym[1024];
+          int n = snprintf(sym, sizeof(sym),
+                           "CONNECT_OBJECT arg5=%p first_word=%p image=%s symbol=%s\n",
+                           (void *)values[i], (void *)first_word,
+                           info.dli_fname ? info.dli_fname : "?",
+                           info.dli_sname ? info.dli_sname : "?");
+          if (n > 0) (void)write(STDERR_FILENO, sym, (size_t)n);
+        }
+      }
+    }
     int result = vsnprintf(dst, maxlen, format, ap);
     for (unsigned i = 0; i < 12; ++i)
       if (values[i]) emit_map_and_memory(values[i], i + 21);
