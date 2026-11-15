@@ -4,9 +4,12 @@ on:
   push:
     branches:
       - repro/oasis-rofl-expired-topup-e2e-20261115
+    paths:
+      - '.github/scripts/patch-oasis-rofl-e2e.mjs'
+      - '.github/workflows/oasis-rofl-expired-topup-e2e.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   rofl-market-runtime-e2e:
@@ -43,4 +46,26 @@ jobs:
         working-directory: oasis-sdk
         env:
           CARGO_TERM_COLOR: always
-        run: cargo test --manifest-path runtime-sdk/modules/rofl-market/Cargo.toml test_instance_topup_after_expiry_charges_full_fee_without_recovering_gap -- --nocapture
+        run: cargo test --manifest-path runtime-sdk/modules/rofl-market/Cargo.toml test_expired_topup_charges_full_fee_and_stale_remove_can_delete_renewed_instance -- --nocapture
+
+      - name: Record result for verification
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TARGET_COMMIT: beae84eac81e67a5134825eb192496c5af079cae
+        run: |
+          mkdir -p .github/test-results
+          {
+            echo "job_status=${JOB_STATUS}"
+            echo "workflow_run=${RUN_URL}"
+            echo "target_commit=${TARGET_COMMIT}"
+            echo "test=test_expired_topup_charges_full_fee_and_stale_remove_can_delete_renewed_instance"
+          } > .github/test-results/oasis-rofl-expired-topup-e2e.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/test-results/oasis-rofl-expired-topup-e2e.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "Record Oasis ROFL runtime E2E result"
+            git push
+          fi
