@@ -155,7 +155,7 @@ if (managerSource.includes(oldRemoval)) {
 } else if (!managerSource.includes("let removed = remove_instance_if_due(")) {
   throw new Error("Could not patch scheduler removal delay predicate.");
 }
-const oldRemoveSubmit = "        self.client.remove_instance(instance).await?;\\n";
+const oldRemoveSubmit = "        self.client.remove_instance(instance).await?;\n";
 if (managerSource.includes(oldRemoveSubmit)) {
   managerSource = managerSource.replace(oldRemoveSubmit, "");
 } else if (!managerSource.includes("remove_instance_if_due(")) {
