@@ -120,11 +120,19 @@ const regressionTest = String.raw`
             messages: vec![round_results_test_event(host_supplied_code)],
             ..Default::default()
         };
-        assert_ne!(
-            mock.runtime_round_results,
-            authenticated,
-            "host input must differ from the authoritative consensus-state value"
-        );
+        if host_supplied_code == 1 {
+            assert_eq!(
+                mock.runtime_round_results,
+                authenticated,
+                "honest host input must match the authoritative consensus-state value"
+            );
+        } else {
+            assert_ne!(
+                mock.runtime_round_results,
+                authenticated,
+                "forged host input must differ from the authoritative consensus-state value"
+            );
+        }
 
         let ctx = mock.create_ctx_for_runtime::<RoundResultsRuntime>(false);
         let denomination = Denomination::from_str("TEST").unwrap();
