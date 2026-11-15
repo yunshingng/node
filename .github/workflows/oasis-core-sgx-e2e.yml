@@ -66,9 +66,11 @@ jobs:
               # container runs as root. Trust the checked-out source directory
               # so Go's VCS stamping can execute git status during the build.
               git config --global --add safe.directory /code
-              make
+              test -r /code/Makefile
+              stat /code/Makefile
+              make -C /code -f /code/Makefile
               unset OASIS_TEE_HARDWARE
-              make test-e2e 2>&1 | tee /tmp/oasis-non-sgx-e2e.log
+              make -C /code -f /code/Makefile test-e2e 2>&1 | tee /tmp/oasis-non-sgx-e2e.log
             '
 
       - name: Upload non-SGX E2E logs
