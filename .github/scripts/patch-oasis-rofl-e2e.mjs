@@ -68,6 +68,20 @@ const managerHelpers = [
   "    Ok(true)",
   "}",
   "",
+  "fn spawn_pending_stop_jobs<F, Fut>(",
+  "    jobs: &mut tokio::task::JoinSet<Result<()>>," ,
+  "    pending_stop: &[(InstanceId, bool)],",
+  "    stop: F,",
+  ")",
+  "where",
+  "    F: Fn(InstanceId, bool) -> Fut,",
+  "    Fut: std::future::Future<Output = Result<()>> + Send + 'static,",
+  "{",
+  "    for (id, wipe_storage) in pending_stop.iter().copied() {",
+  "        jobs.spawn(stop(id, wipe_storage));",
+  "    }",
+  "}",
+  "",
   "async fn stop_instance_host_resources<VolumeRemove, VolumeFuture, BundleRemove, BundleFuture>(",
   "    instance_id: InstanceId,",
   "    wipe_storage: bool,",
@@ -260,6 +274,37 @@ if (managerSource.includes(oldStop)) {
   throw new Error("Could not refactor scheduler host cleanup sequence.");
 }
 
+
+const oldStopJobs = [
+  "        // Prepare jobs to stop instances.",
+  "        let stop_jobs: Vec<_> = local_state",
+  "            .pending_stop",
+  "            .iter()",
+  "            .map(|(id, wipe_storage)| self.clone().stop_instance(*id, *wipe_storage))",
+  "            .collect();",
+].join("\n");
+if (managerSource.includes(oldStopJobs)) {
+  managerSource = managerSource.replace(oldStopJobs + "\n\n", "");
+} else if (!managerSource.includes("spawn_pending_stop_jobs(&mut jobs, &local_state.pending_stop")) {
+  throw new Error("Could not locate production pending-stop job construction.");
+}
+const oldStopSpawn = [
+  "        for job in stop_jobs {",
+  "            jobs.spawn(job);",
+  "        }",
+].join("\n");
+const newStopSpawn = [
+  "        let manager = self.clone();",
+  "        spawn_pending_stop_jobs(&mut jobs, &local_state.pending_stop, move |id, wipe_storage| {",
+  "            manager.clone().stop_instance(id, wipe_storage)",
+  "        });",
+].join("\n");
+if (managerSource.includes(oldStopSpawn)) {
+  managerSource = managerSource.replace(oldStopSpawn, newStopSpawn);
+} else if (!managerSource.includes("spawn_pending_stop_jobs(&mut jobs, &local_state.pending_stop")) {
+  throw new Error("Could not wire pending-stop executor into process_jobs.");
+}
+
 const managerTestAnchor = "    #[test]\n    fn test_offer_policy_absent()";
 const managerTests = [
   "    #[test]",
@@ -445,9 +490,14 @@ const managerProbe = [
     "    /// Reproduce the expiry-snapshot race after a successful top-up.",
     "    pub(crate) async fn host_cleanup_e2e(self: Arc<Self>, paid_until_snapshot: u64, now: u64, renewed_paid_until: u64) -> Result<()> {",
     "        anyhow::ensure!(renewed_paid_until > now, \"fixture must represent a successfully renewed lease\");",
-    "        if !instance_expired(paid_until_snapshot, now) { return Ok(()); }",
-    "        // Production discover() queues this stop from the expiry snapshot; stop_instance() does not re-query paid_until.",
-    "        self.stop_instance(InstanceId::from(4242u64), true).await",
+    "        let actions = expired_instance_actions(paid_until_snapshot, now, true);",
+    "        let Some(actions) = actions else { return Ok(()); };",
+    "        let pending_stop = if actions.stop_running { vec![(InstanceId::from(4242u64), true)] } else { Vec::new() };",
+    "        let mut jobs = tokio::task::JoinSet::new();",
+    "        let manager = self.clone();",
+    "        spawn_pending_stop_jobs(&mut jobs, &pending_stop, move |id, wipe_storage| manager.clone().stop_instance(id, wipe_storage));",
+    "        while let Some(result) = jobs.join_next().await { result??; }",
+    "        Ok(())",
     "    }",
     "",
 ].join("\n");
