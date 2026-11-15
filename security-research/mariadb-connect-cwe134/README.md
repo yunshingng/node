@@ -4,35 +4,31 @@ This directory is an isolated research harness. It does not modify Node.js runti
 
 ## Goal
 
-Validate the reported call path in a real MariaDB server with CONNECT loaded:
+Exercise a real MariaDB server with CONNECT loaded using partitioned CONNECT CSV tables. The suspected source-level call is:
 
-`CREATE TABLE` options -> `GetStringOption()` -> `ha_connect::GetRealString()` -> `snprintf(sv, size, s, partname)`.
+`snprintf(sv, size, s, partname)`
 
-The harness records server version, CONNECT availability, SQL output, process exit status, and server logs. It does **not** claim RCE, arbitrary write, or information disclosure.
+The harness runs a baseline filename, a filename containing extra `%s` conversions, and a `%n` filename. It records SQL output and server logs for each fresh container.
 
 ## Run locally
 
-Requirements: Docker Engine and Docker Compose v2.
+Requirements: Docker Engine.
 
 ```sh
 cd security-research/mariadb-connect-cwe134
 bash run.sh
 ```
 
-The runner creates a disposable MariaDB container, installs/loads CONNECT if the image package provides it, and runs one test case per fresh server container. A crashing server is recorded as a result rather than treated as a successful exploit.
+The runner waits for the final TCP listener (not the temporary socket-only initialization server), creates and selects a dedicated database, and requires each SQL case to complete and return the inserted row. A SQL failure or missing row fails the workflow. The containers are disposable and use a test-only root password.
 
-## Cases
+## Interpretation
 
-- `baseline`: partitioned CONNECT CSV table with a plain filename.
-- `extra-s`: extra `%s` conversions; this is undefined behavior and may crash.
-- `percent-n`: `%n` conversion; outcome depends on the actual libc/build hardening and argument interpretation.
+- A passing baseline confirms the test table syntax and CONNECT CSV path work on the tested image.
+- A passing malformed-format case means only that this input completed on that exact build; it does not establish safety or exploitability.
+- A crash/abort is evidence of availability impact, not RCE.
+- A successful `%n` execution is not proof of a controllable arbitrary write. The actual pointer value, memory permissions, and write effect must be independently established.
+- No RCE, arbitrary write, or information disclosure is claimed by this harness.
 
-The SQL payloads are executed only against the disposable local container created by this harness. Do not point the script at a production server.
+## Scope and limitations
 
-## Important limitations
-
-- MariaDB image package names and CONNECT plugin availability vary by release and distribution. The Docker build intentionally fails visibly if the plugin package cannot be installed.
-- This harness does not establish that the tested binary has the same compiler flags or libc as a vendor release.
-- A process abort is evidence of a crash/DoS condition, not a memory disclosure or RCE.
-- A successful `%n` test is not by itself proof of a controllable arbitrary write. The pointer value and write target must be independently established.
-- GitHub Actions results are authoritative only for the exact image digest and logs recorded by that run.
+The Docker image tag defaults to `mariadb:11.4`; set `MARIADB_IMAGE` to test another official image. The plugin package and binary hardening vary by release and distribution. Results apply only to the exact image digest recorded by the workflow.
