@@ -56,6 +56,7 @@ jobs:
               go version
               rustup show
               command -v sgx-detect
+              cargo install sgxs-tools --locked
               cargo elf2sgxs --help >/dev/null
               make
               unset OASIS_TEE_HARDWARE
