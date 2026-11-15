@@ -2,13 +2,17 @@
 
 This directory is an isolated research harness. It does not modify Node.js runtime code.
 
-## Goal
+## Reproduced result
 
-Exercise a real MariaDB server with CONNECT loaded using partitioned CONNECT CSV tables. The suspected source-level call is:
+On the GitHub Actions image tested on 2026-11-15:
 
-`snprintf(sv, size, s, partname)`
+- MariaDB: `11.4.13-MariaDB-ubu2404`
+- CONNECT plugin: `1.07.0002`, status `ACTIVE`
+- Baseline partitioned CONNECT CSV table: succeeds and returns the inserted row.
+- Filename with extra `%s` conversions: CREATE/INSERT/SELECT completes; CONNECT emits a warning for the derived partition filename. No crash was observed.
+- Filename containing `%n`: MariaDB prints `*** %n in writable segment detected ***`, aborts with signal 6, and the backtrace includes libc `__snprintf_chk` called from `ha_connect.so`.
 
-The harness runs a baseline filename, a filename containing extra `%s` conversions, and a `%n` filename. It records SQL output and server logs for each fresh container.
+The last case is a reproducible server-process denial of service on this tested build. It also confirms that the format string reaches a fortified snprintf path. The abort is caused by glibc fortification rejecting `%n`; this test does **not** show an arbitrary write or RCE.
 
 ## Run locally
 
@@ -19,16 +23,14 @@ cd security-research/mariadb-connect-cwe134
 bash run.sh
 ```
 
-The runner waits for the final TCP listener (not the temporary socket-only initialization server), creates and selects a dedicated database, and requires each SQL case to complete and return the inserted row. A SQL failure or missing row fails the workflow. The containers are disposable and use a test-only root password.
+The runner waits for the final TCP listener (not the temporary socket-only initialization server), creates and selects a dedicated database, and asserts the baseline and extra-`%s` cases complete. For `%n`, it asserts the expected fortified abort signature and stopped server. Each test uses a disposable container and a test-only root password.
 
-## Interpretation
+## Security interpretation
 
-- A passing baseline confirms the test table syntax and CONNECT CSV path work on the tested image.
-- A passing malformed-format case means only that this input completed on that exact build; it does not establish safety or exploitability.
-- A crash/abort is evidence of availability impact, not RCE.
-- A successful `%n` execution is not proof of a controllable arbitrary write. The actual pointer value, memory permissions, and write effect must be independently established.
-- No RCE, arbitrary write, or information disclosure is claimed by this harness.
+- Confirmed: SQL-controlled CONNECT `FILE_NAME` containing `%n` reaches `__snprintf_chk` through `ha_connect.so` and terminates the MariaDB server on the tested build.
+- Impact demonstrated: database server process crash / denial of service.
+- Not demonstrated: arbitrary memory write, information disclosure, code execution, privilege escalation, or unauthenticated remote reachability.
+- The test uses a privileged local database connection to create a partitioned CONNECT table. Exploitability depends on whether an attacker can obtain the required SQL privileges in a target deployment.
+- A crash in this fortified build is not proof that all MariaDB builds behave identically. Results apply only to the exact image digest and binary tested.
 
-## Scope and limitations
-
-The Docker image tag defaults to `mariadb:11.4`; set `MARIADB_IMAGE` to test another official image. The plugin package and binary hardening vary by release and distribution. Results apply only to the exact image digest recorded by the workflow.
+The suspected source-level defect is a user-controlled format string passed as the format argument to `snprintf`. The safe implementation should use a constant format string (for example, `"%s"`) and pass the user-controlled value only as data, after reviewing the intended formatting behavior.
