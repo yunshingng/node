@@ -1,7 +1,10 @@
 job_status=success
-workflow_run=https://github.com/yunshingng/node/actions/runs/43716961528
+workflow_run=https://github.com/yunshingng/node/actions/runs/43723137715
 target_commit=beae84eac81e67a5134825eb192496c5af079cae
-runtime_test=test_expired_topup_charges_full_fee_and_stale_remove_can_delete_renewed_instance
+runtime_test=1 passed; expired-topup, claim-gap and stale-removal Runtime transaction dispatch
 runtime_expired_gap_seconds=2400
 runtime_claim_fixture_gap_delta=9
-scheduler_tests=12 passed; 0 failed; manager::test::
+scheduler_manager_tests=12 passed; 0 failed
+scheduler_host_protocol_e2e=1 passed; real rofl-scheduler process over RHP Unix socket
+scheduler_host_protocol_messages=RuntimeInfoRequest handshake; volume-manager.VolumeRemove; bundle-manager.BundleRemove
+scheduler_host_protocol_build=native non-TDX test build; production Scheduler source and RHP calls exercised; no live Oasis node or physical volume backend
