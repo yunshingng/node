@@ -55,6 +55,7 @@ jobs:
         working-directory: oasis-sdk
         env:
           CARGO_TERM_COLOR: always
+          ROFL_APP_ID: rofl1qrev5wq76npkmcv5wxkdxxcu4dhmu704yyl30h43
         run: |
           cargo test --manifest-path rofl-scheduler/Cargo.toml 'manager::test::' -- --nocapture
 
@@ -62,6 +63,7 @@ jobs:
         working-directory: oasis-sdk
         env:
           CARGO_TERM_COLOR: always
+          ROFL_APP_ID: rofl1qrev5wq76npkmcv5wxkdxxcu4dhmu704yyl30h43
         run: cargo test --manifest-path rofl-scheduler/Cargo.toml --test host_protocol_e2e -- --nocapture
 
       - name: Record result for verification
