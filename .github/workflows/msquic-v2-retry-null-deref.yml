@@ -62,6 +62,8 @@ jobs:
         working-directory: security-research/msquic-v2-retry-null-deref
         env:
           DOTNET_ROLL_FORWARD: LatestPatch
+          MSQUIC_LIB_DIR: ${{ runner.temp }}/msquic/build/bin/Release
+          LD_LIBRARY_PATH: ${{ runner.temp }}/msquic/build/bin/Release
         run: |
           dotnet build MsQuicRetryE2E.csproj --configuration Release
           dotnet --list-runtimes
