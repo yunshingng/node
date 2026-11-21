@@ -1,0 +1,84 @@
+name: MsQuic v2 Retry compatible-version null-deref E2E
+
+on:
+  push:
+    branches:
+      - security-research/msquic-v2-retry-e2e
+    paths:
+      - "security-research/msquic-v2-retry-null-deref/**"
+      - ".github/workflows/msquic-v2-retry-null-deref.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  release-e2e:
+    name: .NET 10.0.15 Release + MsQuic 2.5.11
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout isolated PoC
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            security-research/msquic-v2-retry-null-deref
+          sparse-checkout-cone-mode: true
+
+      - name: Install .NET 10 SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.100
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake perl zlib1g-dev libnuma-dev openssl python3
+
+      - name: Install exact .NET 10.0.15 runtime
+        shell: bash
+        run: |
+          curl -fsSL https://dot.net/v1/dotnet-install.sh -o "$RUNNER_TEMP/dotnet-install.sh"
+          bash "$RUNNER_TEMP/dotnet-install.sh" --runtime dotnet --version 10.0.15 --install-dir "$DOTNET_ROOT"
+          dotnet --list-runtimes
+          dotnet --list-runtimes | grep -F "Microsoft.NETCore.App 10.0.15"
+
+      - name: Build official MsQuic v2.5.11 source in Release
+        shell: bash
+        run: |
+          git clone --depth 1 --branch v2.5.11 --recurse-submodules https://github.com/microsoft/msquic.git "$RUNNER_TEMP/msquic"
+          test "$(git -C "$RUNNER_TEMP/msquic" describe --tags --exact-match)" = "v2.5.11"
+          cmake -S "$RUNNER_TEMP/msquic" -B "$RUNNER_TEMP/msquic/build" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DQUIC_BUILD_SHARED=ON \
+            -DQUIC_BUILD_TOOLS=OFF \
+            -DQUIC_BUILD_TEST=OFF \
+            -DQUIC_ENABLE_LOGGING=OFF
+          cmake --build "$RUNNER_TEMP/msquic/build" --parallel 2
+          echo "MSQUIC_LIB_DIR=$RUNNER_TEMP/msquic/build/bin/Release" >> "$GITHUB_ENV"
+          ls -l "$RUNNER_TEMP/msquic/build/bin/Release"/libmsquic.so*
+
+      - name: Build isolated System.Net.Quic E2E app
+        working-directory: security-research/msquic-v2-retry-null-deref
+        env:
+          DOTNET_ROLL_FORWARD: LatestPatch
+        run: |
+          dotnet build MsQuicRetryE2E.csproj --configuration Release
+          dotnet --list-runtimes
+          dotnet bin/Release/net10.0/MsQuicRetryE2E.dll --check-runtime
+
+      - name: Run secure Release attack and controls
+        shell: bash
+        env:
+          DOTNET_ROLL_FORWARD: LatestPatch
+        run: |
+          chmod +x security-research/msquic-v2-retry-null-deref/run-e2e.sh
+          security-research/msquic-v2-retry-null-deref/run-e2e.sh
+
+      - name: Upload E2E logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: msquic-v2-retry-e2e-logs
+          path: msquic-e2e-results/
+          if-no-files-found: warn
