@@ -1,9 +1,9 @@
-name: MsQuic v2 Retry compatible-version null-deref E2E
+name: MsQuic v2 Retry compatible-version null-deref E2E (current main)
 
 on:
   push:
     branches:
-      - security-research/msquic-v2-retry-e2e
+      - security-research/msquic-main-retry-e2e
     paths:
       - "security-research/msquic-v2-retry-null-deref/**"
       - ".github/workflows/msquic-v2-retry-null-deref.yml"
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   release-e2e:
-    name: .NET 10.0.15 Release + MsQuic 2.5.11
+    name: .NET 10.0.15 Release + MsQuic main 3e870278
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
@@ -43,11 +43,12 @@ jobs:
           dotnet --list-runtimes
           dotnet --list-runtimes | grep -F "Microsoft.NETCore.App 10.0.15"
 
-      - name: Build official MsQuic v2.5.11 source in Release
+      - name: Build current official MsQuic main in Release
         shell: bash
         run: |
-          git clone --depth 1 --branch v2.5.11 --recurse-submodules https://github.com/microsoft/msquic.git "$RUNNER_TEMP/msquic"
-          test "$(git -C "$RUNNER_TEMP/msquic" describe --tags --exact-match)" = "v2.5.11"
+          git clone --depth 1 --branch main --recurse-submodules https://github.com/microsoft/msquic.git "$RUNNER_TEMP/msquic"
+          test "$(git -C "$RUNNER_TEMP/msquic" rev-parse HEAD)" = "3e870278781a6d34524fc55c6bae220e182d6124"
+          git -C "$RUNNER_TEMP/msquic" log -1 --oneline
           cmake -S "$RUNNER_TEMP/msquic" -B "$RUNNER_TEMP/msquic/build" \
             -DCMAKE_BUILD_TYPE=Release \
             -DQUIC_BUILD_SHARED=ON \
@@ -81,6 +82,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: msquic-v2-retry-e2e-logs
+          name: msquic-current-main-retry-e2e-logs
           path: msquic-e2e-results/
           if-no-files-found: warn
