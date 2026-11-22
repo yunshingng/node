@@ -240,6 +240,7 @@ run_case() {
 
 run_case "attack-original-7-byte" "attack-original" "crash"
 run_case "attack-fixedbit" "attack-fixedbit" "crash"
+run_case "attack-alt-source" "attack-alt-source" "crash"
 run_case "control-original-v1" "control-original" "survive"
 run_case "control-v1-retry" "control-retry" "survive"
 
