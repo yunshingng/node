@@ -20,10 +20,11 @@ The client writes a marker only after `QuicConnection.ConnectAsync` completes. T
 
 The harness records `/proc/<client-pid>/maps` to prove which native MsQuic shared library the .NET process loaded. It also enables core dumps and attempts to produce a GDB thread backtrace for each expected crash; backtraces are uploaded with the workflow artifact.
 
-## Technical path under examination
+## Crash backtrace and root-cause status
 
-The current source path performs compatible-version handling in `QuicConnRecvHeader` before dispatching a v2 Retry to `QuicConnRecvRetry`. The version switch calls `QuicCryptoOnVersionChange`. That routine obtains the client handshake CID from `Connection->DestCids.Flink` after only a debug assertion that the list is non-empty. A native core backtrace is needed to confirm whether this is the exact faulting dereference in the reproduced crash; do not treat this source-level candidate as a proven stack trace.
+Release core dumps from both v2 attack variants were captured and inspected with GDB. The faulting thread's top frame is `QuicPacketBuilderGetPacketTypeAndKeyForControlFrames`, called through `QuicPacketBuilderPrepareForControlFrames`, `QuicSendFlush`, and `QuicConnDrainOperations`. This is the observed crash path in the core; it supersedes the earlier static hypothesis that `QuicCryptoOnVersionChange` itself was the faulting frame.
 
+The current symbolized backtrace identifies the faulting native function, but the exact faulting instruction and invalid operand still require register/disassembly correlation. The workflow now records the faulting instruction and general-purpose registers in addition to the full thread backtrace. Do not describe a NULL dereference in `QuicCryptoOnVersionChange` as the confirmed root cause unless that evidence establishes it.
 ## Run and limitations
 
 The GitHub Actions workflow builds official MsQuic v2.6.4 in Release, installs .NET 10.0.15, builds the app in Release, creates a trusted loopback certificate, then executes all four cases.
