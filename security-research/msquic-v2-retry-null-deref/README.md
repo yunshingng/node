@@ -15,6 +15,7 @@ The client writes a marker only after `QuicConnection.ConnectAsync` completes. T
 |---|---|---|
 | Original reported attack | `80 6b 33 43 cf 00 00` | Release client SIGSEGV (139) |
 | Fixed-Bit variation | `c0 6b 33 43 cf 00 00` | Release client SIGSEGV (139) |
+| Alternate source endpoint | `80 6b 33 43 cf 00 00`, sent from `127.0.0.2` and an ephemeral UDP port | Determines whether the exact original peer tuple is required |
 | QUIC v1 Initial control | `80 00 00 00 01 00 00` | Client survives |
 | QUIC v1 Retry control | `f0 00 00 00 01 00 00` | Client survives |
 
@@ -29,7 +30,7 @@ The current symbolized backtrace identifies the faulting native function, but th
 
 The GitHub Actions workflow builds official MsQuic main at the pinned commit above in Release, installs .NET 10.0.15, builds the app in Release, creates a trusted loopback certificate, then executes all four cases.
 
-The test uses a UDP relay that sends the injected packet from the same local peer endpoint used by the established connection. It demonstrates a post-handshake, unauthenticated QUIC datagram reaching the connected client and causing the observed crash. It does **not** yet demonstrate off-path spoofing from an arbitrary Internet host, cross-platform impact, or every deployment configuration.
+The same-endpoint cases use the established peer tuple. An additional test sends the attack packet from a separate local source IP (`127.0.0.2`) and ephemeral UDP port, while keeping the legitimate server relay on `127.0.0.1:4567`. A crash in that case demonstrates that the exact original peer 5-tuple is not required in the local reproduction. This still does **not** establish arbitrary Internet reachability, NAT traversal, CID discoverability, anti-spoofing conditions, cross-platform impact, or every deployment configuration.
 
 A build failure, TLS failure, missing injection, missing loaded-library evidence, hang, absent expected SIGSEGV, or a failing control causes the workflow to fail.
 
