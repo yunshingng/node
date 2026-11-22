@@ -193,6 +193,9 @@ run_case() {
         -ex "info sharedlibrary" \
         /usr/share/dotnet/dotnet "$core_file" >"$case_dir/core-backtrace.txt" 2>&1 || true
       echo "CORE_BACKTRACE_CAPTURED=$case_dir/core-backtrace.txt"
+      # Retain the original core dump as reproducible crash evidence.
+      cp "$core_file" "$case_dir/$(basename "$core_file").dump"
+      sha256sum "$case_dir/$(basename "$core_file").dump" >"$case_dir/core.sha256"
       rm -f "$core_file"
     else
       {
@@ -240,7 +243,9 @@ run_case() {
 
 run_case "attack-original-7-byte" "attack-original" "crash"
 run_case "attack-fixedbit" "attack-fixedbit" "crash"
-run_case "attack-alt-source" "attack-alt-source" "crash"
+run_case "control-alt-ip-port" "attack-alt-source" "survive"
+run_case "control-alt-port" "control-alt-port" "survive"
+run_case "control-alt-ip" "control-alt-ip" "survive"
 run_case "control-original-v1" "control-original" "survive"
 run_case "control-v1-retry" "control-retry" "survive"
 
