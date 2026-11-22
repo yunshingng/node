@@ -7,6 +7,12 @@ APP="$ROOT/bin/Release/net10.0/MsQuicRetryE2E.dll"
 LIB_DIR="${MSQUIC_LIB_DIR:?MSQUIC_LIB_DIR must point to the Release MsQuic build}"
 mkdir -p "$RESULTS"
 
+# Preserve native crash dumps for a symbolized backtrace after a Release crash.
+ulimit -c unlimited
+sudo sysctl -w kernel.core_pattern="$RESULTS/core.%e.%p"
+echo "CORE_PATTERN=$(cat /proc/sys/kernel/core_pattern)"
+echo "CORE_LIMIT=$(ulimit -c)"
+
 export DOTNET_ROLL_FORWARD=LatestPatch
 export LD_LIBRARY_PATH="$LIB_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
@@ -119,7 +125,7 @@ run_case() {
     return 1
   fi
 
-  # Prove the .NET client mapped the MsQuic shared object built from v2.5.11.
+  # Prove the .NET client mapped the selected official MsQuic Release shared object.
   for _ in $(seq 1 50); do
     if [ -r "/proc/$client_pid/maps" ] && grep -q "libmsquic" "/proc/$client_pid/maps"; then
       grep "libmsquic" "/proc/$client_pid/maps" >"$case_dir/client-msquic-maps.txt"
@@ -169,6 +175,27 @@ run_case() {
   kill "$relay_pid" "$server_pid" 2>/dev/null || true
   wait "$relay_pid" "$server_pid" 2>/dev/null || true
 
+  # If the expected crash occurred, extract a native backtrace from its core.
+  if [ "$expected" = "crash" ]; then
+    core_file="$(find "$RESULTS" -maxdepth 1 -type f -name 'core.dotnet.*' -print -quit || true)"
+    if [ -n "$core_file" ]; then
+      gdb --batch --quiet \
+        -ex "set pagination off" \
+        -ex "set debuginfod enabled off" \
+        -ex "thread apply all bt 24" \
+        -ex "info sharedlibrary" \
+        /usr/share/dotnet/dotnet "$core_file" >"$case_dir/core-backtrace.txt" 2>&1 || true
+      echo "CORE_BACKTRACE_CAPTURED=$case_dir/core-backtrace.txt"
+      rm -f "$core_file"
+    else
+      {
+        echo "No core file was found."
+        echo "CORE_PATTERN=$(cat /proc/sys/kernel/core_pattern)"
+      } >"$case_dir/core-backtrace.txt"
+      echo "WARNING: no core dump found for $name"
+    fi
+  fi
+
   {
     echo "case=$name"
     echo "mode=$mode"
@@ -177,6 +204,9 @@ run_case() {
     echo "injected_packet=$(cat "$injection_marker")"
     echo "runtime=$(grep '^RUNTIME=' "$case_dir/client.log" | head -n1)"
     echo "native_library=$(head -n1 "$case_dir/client-msquic-maps.txt")"
+    if [ -s "$case_dir/core-backtrace.txt" ]; then
+      echo "core_backtrace=$case_dir/core-backtrace.txt"
+    fi
   } | tee "$case_dir/result.txt"
 
   cat "$case_dir/client.log"
