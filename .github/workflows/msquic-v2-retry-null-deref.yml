@@ -13,9 +13,9 @@ permissions:
 
 jobs:
   release-e2e:
-    name: .NET 10.0.15 Release + MsQuic 2.5.11
+    name: .NET 10.0.15 Release + MsQuic 2.6.4
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - name: Checkout isolated PoC
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -30,10 +30,10 @@ jobs:
         with:
           dotnet-version: 10.0.100
 
-      - name: Install build dependencies
+      - name: Install build and crash-analysis dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake perl zlib1g-dev libnuma-dev openssl python3
+          sudo apt-get install -y build-essential cmake perl zlib1g-dev libnuma-dev openssl python3 gdb
 
       - name: Install exact .NET 10.0.15 runtime
         shell: bash
@@ -43,11 +43,11 @@ jobs:
           dotnet --list-runtimes
           dotnet --list-runtimes | grep -F "Microsoft.NETCore.App 10.0.15"
 
-      - name: Build official MsQuic v2.5.11 source in Release
+      - name: Build official MsQuic v2.6.4 source in Release
         shell: bash
         run: |
-          git clone --depth 1 --branch v2.5.11 --recurse-submodules https://github.com/microsoft/msquic.git "$RUNNER_TEMP/msquic"
-          test "$(git -C "$RUNNER_TEMP/msquic" describe --tags --exact-match)" = "v2.5.11"
+          git clone --depth 1 --branch v2.6.4 --recurse-submodules https://github.com/microsoft/msquic.git "$RUNNER_TEMP/msquic"
+          test "$(git -C "$RUNNER_TEMP/msquic" describe --tags --exact-match)" = "v2.6.4"
           cmake -S "$RUNNER_TEMP/msquic" -B "$RUNNER_TEMP/msquic/build" \
             -DCMAKE_BUILD_TYPE=Release \
             -DQUIC_BUILD_SHARED=ON \
@@ -69,7 +69,7 @@ jobs:
           dotnet --list-runtimes
           dotnet bin/Release/net10.0/MsQuicRetryE2E.dll --check-runtime
 
-      - name: Run secure Release attack and controls
+      - name: Run secure Release attack, controls, and collect crash backtraces
         shell: bash
         env:
           DOTNET_ROLL_FORWARD: LatestPatch
@@ -77,10 +77,10 @@ jobs:
           chmod +x security-research/msquic-v2-retry-null-deref/run-e2e.sh
           security-research/msquic-v2-retry-null-deref/run-e2e.sh
 
-      - name: Upload E2E logs
+      - name: Upload E2E logs and crash backtraces
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: msquic-v2-retry-e2e-logs
+          name: msquic-v2-retry-e2e-logs-v2.6.4
           path: msquic-e2e-results/
           if-no-files-found: warn
