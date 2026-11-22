@@ -186,10 +186,10 @@ run_case() {
         -ex "thread 1" \
         -ex "info args" \
         -ex "info registers rax rbx rcx rdx rsi rdi rbp rsp rip" \
-        -ex "x/16i $pc-32" \
-        -ex "x/8gx $rdi" \
-        -ex "x/8gx $rsi" \
-        -ex "info symbol $pc" \
+        -ex 'x/16i $pc-32' \
+        -ex 'x/8gx $rdi' \
+        -ex 'x/8gx $rsi' \
+        -ex 'info symbol $pc' \
         -ex "info sharedlibrary" \
         /usr/share/dotnet/dotnet "$core_file" >"$case_dir/core-backtrace.txt" 2>&1 || true
       echo "CORE_BACKTRACE_CAPTURED=$case_dir/core-backtrace.txt"
