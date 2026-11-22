@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   release-e2e:
-    name: .NET 10.0.15 Release + MsQuic 2.6.4
+    name: .NET 10.0.15 Release + MsQuic main @ 3e870278
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
@@ -43,11 +43,11 @@ jobs:
           dotnet --list-runtimes
           dotnet --list-runtimes | grep -F "Microsoft.NETCore.App 10.0.15"
 
-      - name: Build official MsQuic v2.6.4 source in Release
+      - name: Build official MsQuic main source in Release
         shell: bash
         run: |
-          git clone --depth 1 --branch v2.6.4 --recurse-submodules https://github.com/microsoft/msquic.git "$RUNNER_TEMP/msquic"
-          test "$(git -C "$RUNNER_TEMP/msquic" describe --tags --exact-match)" = "v2.6.4"
+          git clone --depth 1 --branch main --recurse-submodules https://github.com/microsoft/msquic.git "$RUNNER_TEMP/msquic"
+          test "$(git -C "$RUNNER_TEMP/msquic" rev-parse HEAD)" = "3e870278781a6d34524fc55c6bae220e182d6124"
           cmake -S "$RUNNER_TEMP/msquic" -B "$RUNNER_TEMP/msquic/build" \
             -DCMAKE_BUILD_TYPE=Release \
             -DQUIC_BUILD_SHARED=ON \
@@ -81,6 +81,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: msquic-v2-retry-e2e-logs-v2.6.4
+          name: msquic-v2-retry-e2e-logs-main-3e870278
           path: msquic-e2e-results/
           if-no-files-found: warn
