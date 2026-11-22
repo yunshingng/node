@@ -3,7 +3,7 @@
 This isolated test exercises a client-side crash using:
 
 - Official .NET runtime 10.0.15 (System.Net.Quic).
-- Microsoft MsQuic source tag **v2.6.4** (latest published release when this test was updated), built as an optimized Release shared library.
+- Microsoft MsQuic **main** at commit `3e870278781a6d34524fc55c6bae220e182d6124` (snapshot verified 2026-11-22), built as an optimized Release shared library. The same four-case E2E already passed against the v2.6.4 release.
 - A loopback QUIC server/client and UDP relay.
 - Ordinary TLS certificate validation. The test creates a temporary local CA and does not disable certificate validation.
 
@@ -27,7 +27,7 @@ Release core dumps from both v2 attack variants were captured and inspected with
 The current symbolized backtrace identifies the faulting native function, but the exact faulting instruction and invalid operand still require register/disassembly correlation. The workflow now records the faulting instruction and general-purpose registers in addition to the full thread backtrace. Do not describe a NULL dereference in `QuicCryptoOnVersionChange` as the confirmed root cause unless that evidence establishes it.
 ## Run and limitations
 
-The GitHub Actions workflow builds official MsQuic v2.6.4 in Release, installs .NET 10.0.15, builds the app in Release, creates a trusted loopback certificate, then executes all four cases.
+The GitHub Actions workflow builds official MsQuic main at the pinned commit above in Release, installs .NET 10.0.15, builds the app in Release, creates a trusted loopback certificate, then executes all four cases.
 
 The test uses a UDP relay that sends the injected packet from the same local peer endpoint used by the established connection. It demonstrates a post-handshake, unauthenticated QUIC datagram reaching the connected client and causing the observed crash. It does **not** yet demonstrate off-path spoofing from an arbitrary Internet host, cross-platform impact, or every deployment configuration.
 
