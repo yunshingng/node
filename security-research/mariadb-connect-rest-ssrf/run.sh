@@ -88,8 +88,8 @@ SQL
 
 grants="$(docker exec "$CONTAINER" mariadb --protocol=tcp -h127.0.0.1 \
   -uroot "-p$ROOT_PASSWORD" -N -e "SHOW GRANTS FOR 'rest_low'@'%';")"
-printf '%s\\n' "$grants" | tee "$LOG_DIR/lowpriv-grants.log"
-if printf '%s\\n' "$grants" | grep -Eiq '(^|[, ])(FILE|SUPER)([, ;]|$)'; then
+printf "%s\n" "$grants" | tee "$LOG_DIR/lowpriv-grants.log"
+if printf "%s\n" "$grants" | grep -Eiq '(^|[, ])(FILE|SUPER)([, ;]|$)'; then
   echo "FAIL: test account unexpectedly has FILE or SUPER" >&2
   exit 1
 fi
@@ -108,7 +108,7 @@ SQL
   2>&1)"
 http_rc=$?
 set -e
-printf '%s\\n' "$http_output" | tee "$LOG_DIR/loopback-http-before-wrapper.log"
+printf "%s\n" "$http_output" | tee "$LOG_DIR/loopback-http-before-wrapper.log"
 docker exec "$CONTAINER" cat /tmp/rest-ssrf-http.log >"$LOG_DIR/http-listener-before-wrapper.log" 2>&1 || true
 if [[ "$http_rc" -ne 0 ]] || ! printf '%s' "$http_output" | grep -Fq "LOCAL_HTTP_FIXTURE_MARKER"; then
   echo "FAIL: low-privilege REST table did not retrieve the loopback HTTP fixture" >&2
@@ -129,7 +129,7 @@ SQL
   2>&1)"
 file_before_rc=$?
 set -e
-printf '%s\\n' "$file_before" | tee "$LOG_DIR/file-protocol-before-wrapper.log"
+printf "%s\n" "$file_before" | tee "$LOG_DIR/file-protocol-before-wrapper.log"
 if ! printf '%s' "$file_before" | grep -Fq "LOCAL_FILE_SECRET_MARKER"; then
   echo "FAIL: expected the unpatched 11.8.9 image to reproduce the file:// read" >&2
   exit 1
@@ -149,7 +149,7 @@ SQL
   2>&1)"
 acl_rc=$?
 set -e
-printf '%s\\n' "$acl_output" | tee "$LOG_DIR/file-privilege-control.log"
+printf "%s\n" "$acl_output" | tee "$LOG_DIR/file-privilege-control.log"
 if [[ "$acl_rc" -eq 0 ]] || ! printf '%s' "$acl_output" | grep -Eiq 'FILE privilege'; then
   echo "FAIL: non-empty FILE_NAME did not enforce the FILE privilege check" >&2
   exit 1
@@ -159,7 +159,7 @@ echo "[PASS] non-empty FILE_NAME is denied without FILE privilege"
 # Emulate the exact curl restriction added by MDEV-41641 in a wrapper.
 # The installed MariaDB 11.8.9 image predates that source patch, so the wrapper
 # lets us exercise the patched curl invocation through the real CONNECT code path.
-curl_path="$(docker exec "$CONTAINER" sh -c 'command -v curl' | tr -d '\\r')"
+curl_path="$(docker exec "$CONTAINER" sh -c 'command -v curl' | tr -d '\r')"
 real_curl_path="${curl_path}.real"
 wrapper="$LOG_DIR/curl-proto-wrapper.sh"
 cat >"$wrapper" <<EOF
@@ -184,7 +184,7 @@ SQL
   2>&1)"
 file_after_rc=$?
 set -e
-printf '%s\\n' "$file_after" | tee "$LOG_DIR/file-protocol-after-wrapper.log"
+printf "%s\n" "$file_after" | tee "$LOG_DIR/file-protocol-after-wrapper.log"
 docker logs "$CONTAINER" >"$LOG_DIR/mariadb-container.log" 2>&1 || true
 if printf '%s' "$file_after" | grep -Fq "LOCAL_FILE_SECRET_MARKER"; then
   echo "FAIL: file:// secret was still disclosed with the patched curl restriction" >&2
@@ -209,7 +209,7 @@ SQL
   2>&1)"
 http_after_rc=$?
 set -e
-printf '%s\\n' "$http_after" | tee "$LOG_DIR/loopback-http-after-wrapper.log"
+printf "%s\n" "$http_after" | tee "$LOG_DIR/loopback-http-after-wrapper.log"
 if [[ "$http_after_rc" -ne 0 ]] || ! printf '%s' "$http_after" | grep -Fq "LOCAL_HTTP_FIXTURE_MARKER"; then
   echo "FAIL: expected patched curl invocation to keep loopback HTTP available" >&2
   exit 1
