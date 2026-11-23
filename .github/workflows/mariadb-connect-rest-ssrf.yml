@@ -1,0 +1,34 @@
+name: MariaDB CONNECT REST SSRF validation
+
+on:
+  push:
+    branches:
+      - "security-research/mariadb-connect-rest-ssrf-20261123"
+    paths:
+      - "security-research/mariadb-connect-rest-ssrf/**"
+      - ".github/workflows/mariadb-connect-rest-ssrf.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rest-ssrf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout test branch
+        uses: actions/checkout@v4
+
+      - name: Run isolated MariaDB CONNECT test
+        env:
+          MARIADB_IMAGE: mariadb:11.8.10
+        run: bash security-research/mariadb-connect-rest-ssrf/run.sh
+
+      - name: Upload result logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mariadb-connect-rest-ssrf-results
+          path: security-research/mariadb-connect-rest-ssrf/results/*.log
+          if-no-files-found: warn
