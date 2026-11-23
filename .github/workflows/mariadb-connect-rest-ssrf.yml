@@ -22,7 +22,7 @@ jobs:
 
       - name: Run isolated MariaDB CONNECT test
         env:
-          MARIADB_IMAGE: mariadb:11.8.10
+          MARIADB_IMAGE: mariadb:11.8
         run: bash security-research/mariadb-connect-rest-ssrf/run.sh
 
       - name: Upload result logs
