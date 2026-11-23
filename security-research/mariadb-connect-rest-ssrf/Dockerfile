@@ -1,4 +1,4 @@
-ARG MARIADB_IMAGE=mariadb:11.8.10
+ARG MARIADB_IMAGE=mariadb:11.8
 FROM ${MARIADB_IMAGE}
 
 RUN apt-get update \
