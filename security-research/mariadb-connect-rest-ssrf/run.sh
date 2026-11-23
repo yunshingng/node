@@ -6,7 +6,7 @@ IMAGE_TAG="mariadb-connect-rest-ssrf:test"
 CONTAINER="mariadb-connect-rest-ssrf-$RANDOM"
 ROOT_PASSWORD="test-only-root-password"
 LOW_PASSWORD="test-only-low-password"
-MARIADB_IMAGE="${MARIADB_IMAGE:-mariadb:11.8.10}"
+MARIADB_IMAGE="${MARIADB_IMAGE:-mariadb:11.8}"
 LOG_DIR="$ROOT/results"
 mkdir -p "$LOG_DIR"
 rm -f "$LOG_DIR"/*.log
