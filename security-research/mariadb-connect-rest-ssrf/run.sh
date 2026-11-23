@@ -150,7 +150,7 @@ SQL
 acl_rc=$?
 set -e
 printf "%s\n" "$acl_output" | tee "$LOG_DIR/file-privilege-control.log"
-if [[ "$acl_rc" -eq 0 ]] || ! printf '%s' "$acl_output" | grep -Eiq 'FILE privilege'; then
+if [[ "$acl_rc" -eq 0 ]] || ! grep -Fq "ERROR 1227" <<<"$acl_output"; then
   echo "FAIL: non-empty FILE_NAME did not enforce the FILE privilege check" >&2
   exit 1
 fi
