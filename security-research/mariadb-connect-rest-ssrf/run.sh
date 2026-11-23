@@ -171,6 +171,17 @@ docker cp "$wrapper" "$CONTAINER:$curl_path"
 docker exec "$CONTAINER" chmod 755 "$curl_path"
 echo "[info] curl wrapper: $curl_path -> $real_curl_path --proto =http,https"
 
+set +e
+wrapper_file_output="$(docker exec "$CONTAINER" "$curl_path" -o /tmp/rest-ssrf-file-probe -- file:///tmp/rest-ssrf-fixture/secret.csv 2>&1)"
+wrapper_file_rc=$?
+set -e
+printf "%s\\n" "$wrapper_file_output" | tee "$LOG_DIR/curl-wrapper-file-probe.log"
+if [[ "$wrapper_file_rc" -eq 0 ]] || ! printf '%s' "$wrapper_file_output" | grep -Eiq 'Protocol "file" disabled|Protocol file disabled'; then
+  echo "FAIL: curl wrapper did not reject file:// directly" >&2
+  exit 1
+fi
+echo "[PASS] curl wrapper rejects file:// directly"
+
 # Test C: same real MariaDB/CONNECT path with the exact protocol restriction.
 set +e
 file_after="$(docker exec -i "$CONTAINER" mariadb --protocol=tcp -h127.0.0.1 \
