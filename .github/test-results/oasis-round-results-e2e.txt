@@ -1,0 +1,7 @@
+job_status=success
+workflow_run=https://github.com/yunshingng/node/actions/runs/45875903299
+core_commit=ffc7dfc9c5f8ce6505f0ccf151e13d087c1c5d5b
+sdk_commit=beae84eac81e67a5134825eb192496c5af079cae
+core_host_test=go test ./worker/compute/executor/committee -count=1 -v
+sdk_financial_test=test_host_forged_round_results_change_consensus_accounts_state
+scope=Core request-boundary forgery regression plus SDK financial state transition using an authenticated consensus MKVS fixture; no live multi-node committee-finalization or production SGX hardware claim
