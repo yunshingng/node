@@ -1,0 +1,11 @@
+job_status=success
+workflow_run=https://github.com/yunshingng/node/actions/runs/45878473085
+core_commit=ffc7dfc9c5f8ce6505f0ccf151e13d087c1c5d5b
+sdk_commit=beae84eac81e67a5134825eb192496c5af079cae
+host_boundary_tests=4 passed
+quorum_test_weak_profile=2 workers / 1 backup / 1 allowed straggler: single scheduler vote accepted after timeout
+quorum_test_3_5_1=single forged scheduler rejected; 3 honest backup votes lead to ErrBadSchedulerCommitment
+quorum_test_sapphire_mainnet_5_7_1=single forged primary rejected; 4 honest backup votes lead to ErrBadSchedulerCommitment
+sdk_financial_test=1 passed; authenticated versus host-forged RoundResults generated distinct state roots and consensus_accounts balances
+financial_fixture=honest Alice balance 1000 / forged Alice balance 0; honest supply 1000 / forged supply 0
+scope=no live multi-node committee finalization or production SGX hardware; actual Core commitment pool and SDK runtime handler tests
