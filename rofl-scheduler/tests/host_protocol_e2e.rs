@@ -63,7 +63,7 @@ fn scheduler_process_uses_real_rhp_host_rpc_for_expiry_cleanup() -> anyhow::Resu
         // Expiry snapshot was captured before the top-up. At execution time the
         // renewed lease is valid, but the production stop path still uses snapshot.
         .env("ROFL_SCHEDULER_PAID_UNTIL_SNAPSHOT", "1744370021")
-        .env("ROFL_SCHEDULER_NOW", "1744372421")
+        .env("ROFL_SCHEDULER_NOW", "1744370621")
         .env("ROFL_SCHEDULER_RENEWED_PAID_UNTIL", "1749554021")
         .stdin(Stdio::null())
         .stdout(Stdio::from(child_log.try_clone()?))
@@ -122,9 +122,10 @@ fn scheduler_process_uses_real_rhp_host_rpc_for_expiry_cleanup() -> anyhow::Resu
     let mut bundle_labels = None;
     let mut volume_exists = true;
 
-    // The Scheduler process uses the Runtime PoC's exact fixture:
-    // expiry 1,744,370,021; top-up time 1,744,372,421; renewed paid_until 1,749,554,021.
-    // The renewed lease is valid when the previously queued stop is dispatched.
+    // The Scheduler process uses the Runtime PoC fixture:
+    // expiry 1,744,370,021; top-up time 1,744,370,621 (600s after expiry); renewed paid_until 1,749,554,021.
+    // The scheduler observed expiry before renewal and dispatches the already queued stop
+    // while the renewed lease is valid; removal is not yet eligible at this 600s point.
     // The process invokes Host::volume_manager().volume_remove() first,
     // then Host::bundle_manager().bundle_remove(). These are actual RHP messages over
     // the Unix socket, not calls to a Rust trait mock.
@@ -195,7 +196,7 @@ fn scheduler_process_uses_real_rhp_host_rpc_for_expiry_cleanup() -> anyhow::Resu
         observed == ["volume-manager.VolumeRemove", "bundle-manager.BundleRemove"],
         "Scheduler did not make the expected host cleanup calls: {observed:?}"
     );
-    anyhow::ensure!(!volume_exists, "expired cleanup must delete the still-existing volume after renewal");
+    anyhow::ensure!(!volume_exists, "expired cleanup must issue the queued stop for the expired instance");
     anyhow::ensure!(
         volume_labels == bundle_labels,
         "volume and bundle cleanup used different instance labels"
