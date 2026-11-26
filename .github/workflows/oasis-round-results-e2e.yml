@@ -1,23 +1,35 @@
-name: Oasis Runtime round-results financial E2E
+name: Oasis Core-to-Runtime round-results financial E2E
 
 on:
   push:
     branches:
       - repro/oasis-round-results-e2e-20261116
     paths:
+      - '.github/scripts/patch-oasis-core-round-results-e2e.mjs'
+      - '.github/scripts/patch-oasis-round-results-e2e.mjs'
+      - '.github/scripts/patch-oasis-round-results-e2e.mjs'
+      - '.github/scripts/patch-oasis-round-results-e2e.mjs'
       - '.github/scripts/patch-oasis-round-results-e2e.mjs'
       - '.github/workflows/oasis-round-results-e2e.yml'
+      - '.github/scripts/patch-oasis-round-results-e2e.mjs'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   round-results-runtime-e2e:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - name: Checkout harness repository
         uses: actions/checkout@v4
+
+      - name: Checkout affected Oasis Core commit
+        uses: actions/checkout@v4
+        with:
+          repository: oasisprotocol/oasis-core
+          ref: ffc7dfc9c5f8ce6505f0ccf151e13d087c1c5d5b
+          path: oasis-core
 
       - name: Checkout affected Oasis SDK commit
         uses: actions/checkout@v4
@@ -26,37 +38,66 @@ jobs:
           ref: beae84eac81e67a5134825eb192496c5af079cae
           path: oasis-sdk
 
+      - name: Install Core Go toolchain
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: oasis-core/go/go.mod
+          cache: true
+          cache-dependency-path: oasis-core/go/go.sum
+
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2026-08-16
           components: rustfmt
 
-      - name: Inject consensus MKVS and financial regression test
+      - name: Inject Core host-boundary forgery hook
+        run: node .github/scripts/patch-oasis-core-round-results-e2e.mjs oasis-core/go/worker/compute/executor/committee/node.go
+
+      - name: Format and test actual Core committee package
+        working-directory: oasis-core/go
+        env:
+          GOFLAGS: -mod=readonly
+        run: |
+          gofmt -w worker/compute/executor/committee/round_results_poc.go worker/compute/executor/committee/round_results_poc_test.go
+          go test ./worker/compute/executor/committee -count=1 -v
+
+      - name: Inject SDK consensus-MKVS financial regression test
         run: node .github/scripts/patch-oasis-round-results-e2e.mjs oasis-sdk/runtime-sdk/src/dispatcher.rs
 
-      - name: Format SDK test
+      - name: Format SDK regression test
         working-directory: oasis-sdk
         run: cargo fmt --manifest-path runtime-sdk/Cargo.toml
 
-      - name: Run SDK Runtime financial state-transition E2E
+      - name: Run SDK financial state-transition regression test
         working-directory: oasis-sdk
         env:
           CARGO_TERM_COLOR: always
         run: cargo test --manifest-path runtime-sdk/Cargo.toml test_host_forged_round_results_change_consensus_accounts_state -- --nocapture
 
-      - name: Record verification scope
+      - name: Record result back to the test branch
         if: always()
         env:
           JOB_STATUS: ${{ job.status }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          TARGET_COMMIT: beae84eac81e67a5134825eb192496c5af079cae
+          CORE_COMMIT: ffc7dfc9c5f8ce6505f0ccf151e13d087c1c5d5b
+          SDK_COMMIT: beae84eac81e67a5134825eb192496c5af079cae
         run: |
+          mkdir -p .github/test-results
           {
             echo "job_status=${JOB_STATUS}"
             echo "workflow_run=${RUN_URL}"
-            echo "target_commit=${TARGET_COMMIT}"
-            echo "test=test_host_forged_round_results_change_consensus_accounts_state"
-            echo "scope=SDK Runtime dispatcher message-result processing with a real consensus MKVS fixture; not a live signed Core enclave request or committee-finalization test"
-          } | tee round-results-e2e-result.txt
-          cat round-results-e2e-result.txt >> "$GITHUB_STEP_SUMMARY"
+            echo "core_commit=${CORE_COMMIT}"
+            echo "sdk_commit=${SDK_COMMIT}"
+            echo "core_host_test=go test ./worker/compute/executor/committee -count=1 -v"
+            echo "sdk_financial_test=test_host_forged_round_results_change_consensus_accounts_state"
+            echo "scope=Core request-boundary forgery regression plus SDK financial state transition using an authenticated consensus MKVS fixture; no live multi-node committee-finalization or production SGX hardware claim"
+          } | tee .github/test-results/oasis-round-results-e2e.txt
+          cat .github/test-results/oasis-round-results-e2e.txt >> "$GITHUB_STEP_SUMMARY"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/test-results/oasis-round-results-e2e.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "Record Oasis round-results E2E result"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
