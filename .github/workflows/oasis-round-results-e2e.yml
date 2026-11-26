@@ -1,4 +1,4 @@
-name: Oasis Core-to-Runtime round-results financial E2E
+name: Oasis Core-to-Runtime round-results financial and quorum E2E
 
 on:
   push:
@@ -6,12 +6,9 @@ on:
       - repro/oasis-round-results-e2e-20261116
     paths:
       - '.github/scripts/patch-oasis-core-round-results-e2e.mjs'
-      - '.github/scripts/patch-oasis-round-results-e2e.mjs'
-      - '.github/scripts/patch-oasis-round-results-e2e.mjs'
-      - '.github/scripts/patch-oasis-round-results-e2e.mjs'
+      - '.github/scripts/patch-oasis-core-quorum-e2e.mjs'
       - '.github/scripts/patch-oasis-round-results-e2e.mjs'
       - '.github/workflows/oasis-round-results-e2e.yml'
-      - '.github/scripts/patch-oasis-round-results-e2e.mjs'
 
 permissions:
   contents: write
@@ -62,6 +59,17 @@ jobs:
           gofmt -w worker/compute/executor/committee/round_results_poc.go worker/compute/executor/committee/round_results_poc_test.go
           go test ./worker/compute/executor/committee -count=1 -v
 
+      - name: Inject Core commitment-pool quorum tests
+        run: node .github/scripts/patch-oasis-core-quorum-e2e.mjs oasis-core/go/roothash/api/commitment/pool_test.go
+
+      - name: Format and run Core consensus commitment-pool proof
+        working-directory: oasis-core/go
+        env:
+          GOFLAGS: -mod=readonly
+        run: |
+          gofmt -w roothash/api/commitment/pool_test.go
+          go test ./roothash/api/commitment -run '^TestPoC' -count=1 -v
+
       - name: Inject SDK consensus-MKVS financial regression test
         run: node .github/scripts/patch-oasis-round-results-e2e.mjs oasis-sdk/runtime-sdk/src/dispatcher.rs
 
@@ -90,8 +98,9 @@ jobs:
             echo "core_commit=${CORE_COMMIT}"
             echo "sdk_commit=${SDK_COMMIT}"
             echo "core_host_test=go test ./worker/compute/executor/committee -count=1 -v"
+            echo "core_quorum_test=go test ./roothash/api/commitment -run '^TestPoC' -count=1 -v"
             echo "sdk_financial_test=test_host_forged_round_results_change_consensus_accounts_state"
-            echo "scope=Core request-boundary forgery regression plus SDK financial state transition using an authenticated consensus MKVS fixture; no live multi-node committee-finalization or production SGX hardware claim"
+            echo "scope=Core host request-boundary, commitment-pool quorum and SDK financial state transition with authenticated consensus MKVS fixture; no live multi-node committee or production SGX hardware claim"
           } | tee .github/test-results/oasis-round-results-e2e.txt
           cat .github/test-results/oasis-round-results-e2e.txt >> "$GITHUB_STEP_SUMMARY"
           git config user.name "github-actions[bot]"
