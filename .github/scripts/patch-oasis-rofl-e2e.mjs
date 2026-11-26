@@ -139,7 +139,7 @@ const oldRemovalDelay = [
 ].join("\n");
 const newRemovalDelay = [
   "        if !removal_delay_elapsed(ts, now, max_delta) {",
-  "            return Ok(())",
+  "            return Ok(());",
   "        }",
 ].join("\n");
 if (managerSource.includes(oldRemovalDelay)) {
