@@ -134,14 +134,14 @@ if (managerSource.includes(oldExpiry)) {
 
 const oldRemovalDelay = [
   "        if now.saturating_sub(ts) < max_delta {",
-  "            return Ok(())",
+  "            return Ok(());",
   "        }",
-].join("\\n");
+].join("\n");
 const newRemovalDelay = [
   "        if !removal_delay_elapsed(ts, now, max_delta) {",
   "            return Ok(())",
   "        }",
-].join("\\n");
+].join("\n");
 if (managerSource.includes(oldRemovalDelay)) {
   managerSource = managerSource.replace(oldRemovalDelay, newRemovalDelay);
 } else if (!managerSource.includes("if !removal_delay_elapsed(ts, now, max_delta)")) {
