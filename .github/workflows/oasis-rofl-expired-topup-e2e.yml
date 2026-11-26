@@ -79,6 +79,10 @@ jobs:
             echo "workflow_run=${RUN_URL}"
             echo "target_commit=${TARGET_COMMIT}"
             echo "runtime_test=test_expired_topup_charges_full_fee_and_claims_expired_gap"
+            echo "runtime_expired_gap_seconds=600"
+            echo "runtime_provider_fee_for_gap_delta=2"
+            echo "scheduler_removal_min_delay_seconds=1350"
+            echo "scheduler_timing_test=test_ten_minute_expired_topup_is_before_minimum_removal_delay"
             echo "scheduler_tests=manager::test:: suite passed; see CI log for exact count"
             echo "scheduler_host_protocol_e2e=test_scheduler_process_uses_real_rhp_host_rpc_for_expiry_cleanup (simulated Host backend)"
           } | tee .github/test-results/oasis-rofl-expired-topup-e2e.txt
