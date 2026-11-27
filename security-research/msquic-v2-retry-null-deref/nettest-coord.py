@@ -50,3 +50,10 @@ def wait_file(name, output, timeout=300):
             time.sleep(2)
     raise SystemExit(f"TIMEOUT waiting for {path}: {last}")
 
+if __name__ == "__main__":
+    if len(sys.argv) == 4 and sys.argv[1] == "publish":
+        publish(sys.argv[2], sys.argv[3])
+    elif len(sys.argv) == 4 and sys.argv[1] == "wait":
+        wait_file(sys.argv[2], sys.argv[3])
+    else:
+        raise SystemExit("usage: nettest-coord.py publish|wait <name> <local-file>")
