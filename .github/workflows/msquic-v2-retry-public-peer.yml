@@ -1,7 +1,17 @@
 name: MsQuic QUICv2 Retry public-peer off-path validation
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - security-research/msquic-v2-retry-e2e
+    paths:
+      - "security-research/msquic-v2-retry-null-deref/Program.cs"
+      - "security-research/msquic-v2-retry-null-deref/build-msquic-e2e.sh"
+      - "security-research/msquic-v2-retry-null-deref/nettest-coord.py"
+      - "security-research/msquic-v2-retry-null-deref/stun-probe.py"
+      - "security-research/msquic-v2-retry-null-deref/internet-offpath-sniffer.py"
+      - "security-research/msquic-v2-retry-null-deref/public-h3-*.sh"
+      - ".github/workflows/msquic-v2-retry-public-peer.yml"
       - "security-research/msquic-v2-retry-null-deref/Program.cs"
       - "security-research/msquic-v2-retry-null-deref/build-msquic-e2e.sh"
       - "security-research/msquic-v2-retry-null-deref/nettest-coord.py"
