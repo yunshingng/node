@@ -41,7 +41,7 @@ for host in servers:
             data,peer=sock.recvfrom(2048)
             mapped=parse_response(data,txid)
             results.append({"stun_server":host,"stun_ip":destination[0],"mapped_ip":mapped[0],"mapped_port":mapped[1]})
-            print(f"STUN {host} -> {mapped[0]}:{mapped[1]}",flush=True)
+            print(f"STUN {host} -> {mapped[0]}:{mapped[1]}",file=sys.stderr,flush=True)
             break
         except socket.timeout:
             last="timeout"
