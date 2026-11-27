@@ -1,0 +1,93 @@
+name: MsQuic QUICv2 Retry public-peer off-path validation
+
+on:
+  push:
+    branches:
+      - security-research/msquic-v2-retry-e2e
+    paths:
+      - "security-research/msquic-v2-retry-null-deref/Program.cs"
+      - "security-research/msquic-v2-retry-null-deref/build-msquic-e2e.sh"
+      - "security-research/msquic-v2-retry-null-deref/nettest-coord.py"
+      - "security-research/msquic-v2-retry-null-deref/internet-offpath-sniffer.py"
+      - "security-research/msquic-v2-retry-null-deref/public-h3-*.sh"
+      - ".github/workflows/msquic-v2-retry-public-peer.yml"
+
+permissions:
+  contents: write
+
+env:
+  COORD_BRANCH: security-research/msquic-offpath-nettest-coordination
+
+jobs:
+  public-h3-client:
+    name: MsQuic client connected to public HTTP/3 peer (runner B)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout isolated PoC
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            security-research/msquic-v2-retry-null-deref
+          sparse-checkout-cone-mode: true
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.100
+
+      - name: Build exact Release MsQuic and E2E app
+        run: bash security-research/msquic-v2-retry-null-deref/build-msquic-e2e.sh
+
+      - name: Verify .NET 10.0.15 loads the official MsQuic Release library
+        env:
+          DOTNET_ROLL_FORWARD: LatestPatch
+          LD_LIBRARY_PATH: ${{ runner.temp }}/msquic/build/bin/Release
+        run: |
+          dotnet --list-runtimes
+          dotnet security-research/msquic-v2-retry-null-deref/bin/Release/net10.0/MsQuicRetryE2E.dll --check-runtime
+
+      - name: Connect to public HTTP/3 service and hold MsQuic connection
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash security-research/msquic-v2-retry-null-deref/public-h3-client.sh
+
+      - name: Upload client logs, packet capture and core
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offpath-public-peer-client-${{ github.run_id }}-${{ github.run_attempt }}
+          path: msquic-public-peer-results/client/
+          if-no-files-found: warn
+
+  public-h3-attacker:
+    name: Independent off-path source-spoof port sweep (runner C)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout isolated PoC
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            security-research/msquic-v2-retry-null-deref
+          sparse-checkout-cone-mode: true
+
+      - name: Install raw packet tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 tcpdump curl jq
+
+      - name: Send forged peer packets from a separate Internet host
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash security-research/msquic-v2-retry-null-deref/public-h3-attacker.sh
+
+      - name: Upload attacker egress pcap and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offpath-public-peer-attacker-${{ github.run_id }}-${{ github.run_attempt }}
+          path: msquic-public-peer-results/attacker/
+          if-no-files-found: warn
