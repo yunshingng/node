@@ -15,9 +15,12 @@ answers=socket.getaddrinfo(sys.argv[1],443,socket.AF_INET,socket.SOCK_DGRAM)
 print(answers[0][4][0])
 PY
 )"
+python3 "$ROOT/stun-probe.py" "$LOCAL_PORT" > "$RESULTS/stun-mapping.json"
+MAPPED_IP="$(jq -r .mapped_ip "$RESULTS/stun-mapping.json")"
+MAPPED_PORT="$(jq -r .mapped_port "$RESULTS/stun-mapping.json")"
 CLIENT_PUBLIC_IP="$(curl -4 -fsS https://api.ipify.org)"
-printf '{"peer_host":"%s","peer_ip":"%s","peer_port":443,"client_public_ip":"%s","client_local_port":%d,"scan_port_low":1,"scan_port_high":65535}\n' \
-  "$HOST" "$PEER_IP" "$CLIENT_PUBLIC_IP" "$LOCAL_PORT" > "$RESULTS/mapping.json"
+printf '{"peer_host":"%s","peer_ip":"%s","peer_port":443,"client_public_ip":"%s","client_public_port":%d,"client_local_port":%d,"stun_mapping_consistent":true}\n' \
+  "$HOST" "$PEER_IP" "$MAPPED_IP" "$MAPPED_PORT" "$LOCAL_PORT" > "$RESULTS/mapping.json"
 cat "$RESULTS/mapping.json"
 
 sudo sysctl -w kernel.core_pattern="$RESULTS/core.%e.%p" >/dev/null
