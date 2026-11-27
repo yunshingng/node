@@ -56,10 +56,21 @@ for host,port in servers:
 sock.close()
 if len({x["stun_ip"] for x in results}) != len(results):
     raise SystemExit("FAIL: STUN probes did not reach distinct server IPv4 addresses; NAT mapping comparison is invalid")
-endpoints={(x["mapped_ip"],x["mapped_port"]) for x in results}
-if len(endpoints)!=1:
-    print(json.dumps({"local_port":local_port,"results":results,"mapping_consistent":False},indent=2))
-    raise SystemExit("FAIL: STUN mappings differ across remote endpoints; cannot safely infer the QUIC peer mapping")
-mapped_ip,mapped_port=next(iter(endpoints))
-print(json.dumps({"local_port":local_port,"mapped_ip":mapped_ip,"mapped_port":mapped_port,
-                  "mapping_consistent":True,"results":results},indent=2))
+
+mapped_ips={x["mapped_ip"] for x in results}
+if len(mapped_ips) != 1:
+    print(json.dumps({"local_port":local_port,"results":results,"mapping_ip_consistent":False},indent=2))
+    raise SystemExit("FAIL: STUN mapped public IP differs by destination; cannot infer the peer-specific public IP safely")
+
+mapped_ip=next(iter(mapped_ips))
+mapped_ports=sorted({x["mapped_port"] for x in results})
+result={
+    "local_port":local_port,
+    "mapped_ip":mapped_ip,
+    "mapped_ports":mapped_ports,
+    "mapping_ip_consistent":True,
+    "mapping_port_dependent":len(mapped_ports)>1,
+    "results":results,
+    "note":"STUN ports are not assumed to equal the QUIC peer mapping; the attacker sweeps all UDP destination ports."
+}
+print(json.dumps(result,indent=2))
