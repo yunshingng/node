@@ -66,7 +66,7 @@ grep -q SERVER_LISTENING "$RESULTS/server.log"
 
 python3 "$ROOT/relay.py" --bind-address 10.200.0.1 --upstream-address 127.0.0.1 \
   --listen 4567 --upstream 4568 --mode attack-original \
-  --marker "$RESULTS/client-connected" --injection-marker "$RESULTS/unused-marker" \
+  --marker "$RESULTS/relay-injection-disabled" --injection-marker "$RESULTS/unused-marker" \
   >"$RESULTS/relay.log" 2>&1 &
 RELAY_PID=$!
 sleep .3
