@@ -1,7 +1,7 @@
 name: MsQuic QUICv2 Retry off-path Internet spoof validation
 
 on:
-  push:
+  workflow_dispatch:
     branches:
       - security-research/msquic-v2-retry-e2e
     paths:
