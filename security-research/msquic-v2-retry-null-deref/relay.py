@@ -28,6 +28,8 @@ def make_packet(mode: str) -> bytes:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--bind-address", default="127.0.0.1")
+    parser.add_argument("--upstream-address", default="127.0.0.1")
     parser.add_argument("--listen", type=int, default=4567)
     parser.add_argument("--upstream", type=int, default=4568)
     parser.add_argument("--mode", choices=MODES, required=True)
@@ -40,13 +42,13 @@ def main() -> int:
     injection_marker = pathlib.Path(args.injection_marker)
     packet = make_packet(args.mode)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind(("127.0.0.1", args.listen))
+    sock.bind((args.bind_address, args.listen))
     sock.settimeout(0.5)
 
     client = None
     server_datagrams = 0
     injected = False
-    upstream = ("127.0.0.1", args.upstream)
+    upstream = (args.upstream_address, args.upstream)
 
     print(
         f"RELAY_READY listen={args.listen} upstream={args.upstream} "
