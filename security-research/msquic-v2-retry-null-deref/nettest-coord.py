@@ -53,7 +53,8 @@ def wait_file(name, output, timeout=300):
 if __name__ == "__main__":
     if len(sys.argv) == 4 and sys.argv[1] == "publish":
         publish(sys.argv[2], sys.argv[3])
-    elif len(sys.argv) == 4 and sys.argv[1] == "wait":
-        wait_file(sys.argv[2], sys.argv[3])
+    elif len(sys.argv) in (4, 5) and sys.argv[1] == "wait":
+        timeout = int(sys.argv[4]) if len(sys.argv) == 5 else 300
+        wait_file(sys.argv[2], sys.argv[3], timeout)
     else:
-        raise SystemExit("usage: nettest-coord.py publish|wait <name> <local-file>")
+        raise SystemExit("usage: nettest-coord.py publish <name> <local-file> | wait <name> <local-file> [timeout-seconds]")
