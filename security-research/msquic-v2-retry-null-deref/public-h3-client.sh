@@ -17,10 +17,11 @@ PY
 )"
 python3 "$ROOT/stun-probe.py" "$LOCAL_PORT" > "$RESULTS/stun-mapping.json"
 MAPPED_IP="$(jq -r .mapped_ip "$RESULTS/stun-mapping.json")"
-MAPPED_PORT="$(jq -r .mapped_port "$RESULTS/stun-mapping.json")"
-CLIENT_PUBLIC_IP="$(curl -4 -fsS https://api.ipify.org)"
-printf '{"peer_host":"%s","peer_ip":"%s","peer_port":443,"client_public_ip":"%s","client_public_port":%d,"client_local_port":%d,"stun_mapping_consistent":true}\n' \
-  "$HOST" "$PEER_IP" "$MAPPED_IP" "$MAPPED_PORT" "$LOCAL_PORT" > "$RESULTS/mapping.json"
+MAPPED_PORTS="$(jq -c .mapped_ports "$RESULTS/stun-mapping.json")"
+IPIFY_PUBLIC_IP="$(curl -4 -fsS https://api.ipify.org)"
+printf '{"peer_host":"%s","peer_ip":"%s","peer_port":443,"client_public_ip":"%s","client_public_ports_from_stun":%s,"client_local_port":%d,"mapping_ip_consistent":true,"attack_mode":"full_udp_destination_port_sweep_1_65535"}\n' \
+  "$HOST" "$PEER_IP" "$MAPPED_IP" "$MAPPED_PORTS" "$LOCAL_PORT" > "$RESULTS/mapping.json"
+printf 'IPIFY_PUBLIC_IP=%s\n' "$IPIFY_PUBLIC_IP" > "$RESULTS/ipify.txt"
 cat "$RESULTS/mapping.json"
 
 sudo sysctl -w kernel.core_pattern="$RESULTS/core.%e.%p" >/dev/null
