@@ -35,6 +35,13 @@ jobs:
 
       - name: Build exact Release MsQuic and E2E app
         run: bash security-research/msquic-v2-retry-null-deref/build-msquic-e2e.sh
+      - name: Verify .NET 10.0.15 loads the official MsQuic Release library
+        env:
+          DOTNET_ROLL_FORWARD: LatestPatch
+          LD_LIBRARY_PATH: ${{ runner.temp }}/msquic/build/bin/Release
+        run: |
+          dotnet --list-runtimes
+          dotnet security-research/msquic-v2-retry-null-deref/bin/Release/net10.0/MsQuicRetryE2E.dll --check-runtime
 
       - name: Publish public endpoint and run QUIC server
         env:
@@ -69,6 +76,13 @@ jobs:
 
       - name: Build exact Release MsQuic and E2E app
         run: bash security-research/msquic-v2-retry-null-deref/build-msquic-e2e.sh
+      - name: Verify .NET 10.0.15 loads the official MsQuic Release library
+        env:
+          DOTNET_ROLL_FORWARD: LatestPatch
+          LD_LIBRARY_PATH: ${{ runner.temp }}/msquic/build/bin/Release
+        run: |
+          dotnet --list-runtimes
+          dotnet security-research/msquic-v2-retry-null-deref/bin/Release/net10.0/MsQuicRetryE2E.dll --check-runtime
 
       - name: Run QUIC client and capture incoming spoof
         env:
