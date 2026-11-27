@@ -3,7 +3,7 @@ set -Eeuo pipefail
 ROOT="security-research/msquic-v2-retry-null-deref"
 RESULTS="$GITHUB_WORKSPACE/msquic-public-peer-results/attacker-macos"
 mkdir -p "$RESULTS"
-python3 "$ROOT/nettest-coord.py" wait "peer-mapping.json" "$RESULTS/mapping.json" 300
+python3 "$ROOT/nettest-coord.py" wait "peer-mapping.json" "$RESULTS/mapping.json" 900
 
 ATTACKER_PUBLIC_IP="$(curl -4 -fsS https://api.ipify.org)"
 PEER_IP="$(python3 - "$RESULTS/mapping.json" <<'PY'
