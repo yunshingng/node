@@ -76,6 +76,8 @@ jobs:
         run: |
           chmod +x security-research/msquic-v2-retry-null-deref/run-e2e.sh
           security-research/msquic-v2-retry-null-deref/run-e2e.sh
+          chmod +x security-research/msquic-v2-retry-null-deref/offpath-spoof-e2e.sh
+          security-research/msquic-v2-retry-null-deref/offpath-spoof-e2e.sh
 
       - name: Upload E2E logs and crash backtraces
         if: always()
