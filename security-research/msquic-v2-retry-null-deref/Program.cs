@@ -199,7 +199,7 @@ internal static class Program
         var decoder = await connection.OpenOutboundStreamAsync(QuicStreamType.Unidirectional);
         await decoder.WriteAsync(new byte[] { 0x03 });
 
-        using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(90));
+        using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(600));
         Task acceptTask = Task.Run(async () =>
         {
             while (!stop.IsCancellationRequested)
