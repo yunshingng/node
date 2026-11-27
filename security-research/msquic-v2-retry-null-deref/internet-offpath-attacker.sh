@@ -6,6 +6,14 @@ mkdir -p "$RESULTS"
 python3 "$ROOT/nettest-coord.py" wait "server.json" "$RESULTS/server.json"
 python3 "$ROOT/nettest-coord.py" wait "mapping.json" "$RESULTS/mapping.json"
 cat "$RESULTS/server.json" "$RESULTS/mapping.json"
+ATTACKER_IP="$(curl -4 -fsS https://api.ipify.org)"
+SERVER_IP="$(jq -r .server_ip "$RESULTS/server.json")"
+CLIENT_IP="$(jq -r .client_public_ip "$RESULTS/mapping.json")"
+printf 'ATTACKER_PUBLIC_IP=%s\nSERVER_PUBLIC_IP=%s\nCLIENT_PUBLIC_IP=%s\n' "$ATTACKER_IP" "$SERVER_IP" "$CLIENT_IP" | tee "$RESULTS/network-identities.txt"
+if [ "$ATTACKER_IP" = "$SERVER_IP" ] || [ "$ATTACKER_IP" = "$CLIENT_IP" ] || [ "$SERVER_IP" = "$CLIENT_IP" ]; then
+  echo "FAIL: runner public IPs are not three distinct Internet endpoints; test cannot establish cross-host spoofing"
+  exit 1
+fi
 sudo tcpdump -U -ni any udp -w "$RESULTS/attacker-egress.pcap" >/dev/null 2>&1 &
 CAP_PID=$!
 sleep 1
