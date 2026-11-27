@@ -1,4 +1,4 @@
-name: MsQuic v2 Retry compatible-version null-deref E2E
+name: MsQuic QUICv2 Retry off-path Internet spoof validation
 
 on:
   push:
@@ -9,13 +9,16 @@ on:
       - ".github/workflows/msquic-v2-retry-null-deref.yml"
 
 permissions:
-  contents: read
+  contents: write
+
+env:
+  COORD_BRANCH: security-research/msquic-offpath-nettest-coordination
 
 jobs:
-  release-e2e:
-    name: .NET 10.0.15 Release + MsQuic main @ aa31c3f
+  internet-server:
+    name: Public QUIC server (runner A)
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 15
     steps:
       - name: Checkout isolated PoC
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -25,64 +28,88 @@ jobs:
             security-research/msquic-v2-retry-null-deref
           sparse-checkout-cone-mode: true
 
-      - name: Install .NET 10 SDK
+      - name: Install .NET SDK
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.100
 
-      - name: Install build and crash-analysis dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake perl zlib1g-dev libnuma-dev openssl python3 gdb
+      - name: Build exact Release MsQuic and E2E app
+        run: bash security-research/msquic-v2-retry-null-deref/build-msquic-e2e.sh
 
-      - name: Install exact .NET 10.0.15 runtime
-        shell: bash
-        run: |
-          curl -fsSL https://dot.net/v1/dotnet-install.sh -o "$RUNNER_TEMP/dotnet-install.sh"
-          bash "$RUNNER_TEMP/dotnet-install.sh" --runtime dotnet --version 10.0.15 --install-dir "$DOTNET_ROOT"
-          dotnet --list-runtimes
-          dotnet --list-runtimes | grep -F "Microsoft.NETCore.App 10.0.15"
-
-      - name: Build official MsQuic main source in Release
-        shell: bash
-        run: |
-          git clone --depth 1 --branch main --recurse-submodules https://github.com/microsoft/msquic.git "$RUNNER_TEMP/msquic"
-          test "$(git -C "$RUNNER_TEMP/msquic" rev-parse HEAD)" = "aa31c3f8641934653a8acfe5f4d22b2465b7d509"
-          cmake -S "$RUNNER_TEMP/msquic" -B "$RUNNER_TEMP/msquic/build" \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DQUIC_BUILD_SHARED=ON \
-            -DQUIC_BUILD_TOOLS=OFF \
-            -DQUIC_BUILD_TEST=OFF \
-            -DQUIC_ENABLE_LOGGING=OFF
-          cmake --build "$RUNNER_TEMP/msquic/build" --parallel 2
-          echo "MSQUIC_LIB_DIR=$RUNNER_TEMP/msquic/build/bin/Release" >> "$GITHUB_ENV"
-          ls -l "$RUNNER_TEMP/msquic/build/bin/Release"/libmsquic.so*
-
-      - name: Build isolated System.Net.Quic E2E app
-        working-directory: security-research/msquic-v2-retry-null-deref
+      - name: Publish public endpoint and run QUIC server
         env:
-          DOTNET_ROLL_FORWARD: LatestPatch
-          MSQUIC_LIB_DIR: ${{ runner.temp }}/msquic/build/bin/Release
-          LD_LIBRARY_PATH: ${{ runner.temp }}/msquic/build/bin/Release
-        run: |
-          dotnet build MsQuicRetryE2E.csproj --configuration Release
-          dotnet --list-runtimes
-          dotnet bin/Release/net10.0/MsQuicRetryE2E.dll --check-runtime
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash security-research/msquic-v2-retry-null-deref/internet-offpath-server.sh
 
-      - name: Run secure Release attack, controls, and collect crash backtraces
-        shell: bash
-        env:
-          DOTNET_ROLL_FORWARD: LatestPatch
-        run: |
-          chmod +x security-research/msquic-v2-retry-null-deref/run-e2e.sh
-          security-research/msquic-v2-retry-null-deref/run-e2e.sh
-          chmod +x security-research/msquic-v2-retry-null-deref/offpath-spoof-e2e.sh
-          security-research/msquic-v2-retry-null-deref/offpath-spoof-e2e.sh
-
-      - name: Upload E2E logs and crash backtraces
+      - name: Upload server evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: msquic-v2-retry-e2e-logs-main-aa31c3f
-          path: msquic-e2e-results/
+          name: offpath-internet-server-${{ github.run_id }}-${{ github.run_attempt }}
+          path: msquic-internet-results/server/
+          if-no-files-found: warn
+
+  internet-client:
+    name: QUIC client behind independent Internet edge (runner B)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout isolated PoC
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            security-research/msquic-v2-retry-null-deref
+          sparse-checkout-cone-mode: true
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.100
+
+      - name: Build exact Release MsQuic and E2E app
+        run: bash security-research/msquic-v2-retry-null-deref/build-msquic-e2e.sh
+
+      - name: Run QUIC client and capture incoming spoof
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash security-research/msquic-v2-retry-null-deref/internet-offpath-client.sh
+
+      - name: Upload client evidence and core
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offpath-internet-client-${{ github.run_id }}-${{ github.run_attempt }}
+          path: msquic-internet-results/client/
+          if-no-files-found: warn
+
+  internet-attacker:
+    name: Independent off-path source-spoof sender (runner C)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout isolated PoC
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            security-research/msquic-v2-retry-null-deref
+          sparse-checkout-cone-mode: true
+
+      - name: Install raw-packet capture tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 tcpdump curl jq
+
+      - name: Send exactly one spoofed UDP datagram from separate Internet runner
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash security-research/msquic-v2-retry-null-deref/internet-offpath-attacker.sh
+
+      - name: Upload attacker packet evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offpath-internet-attacker-${{ github.run_id }}-${{ github.run_attempt }}
+          path: msquic-internet-results/attacker/
           if-no-files-found: warn
