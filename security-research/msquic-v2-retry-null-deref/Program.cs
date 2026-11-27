@@ -57,7 +57,7 @@ internal static class Program
 
         var listenerOptions = new QuicListenerOptions
         {
-            ListenEndPoint = new IPEndPoint(IPAddress.Loopback, 4568),
+            ListenEndPoint = new IPEndPoint(IPAddress.Parse(Environment.GetEnvironmentVariable("QUIC_LISTEN_IP") ?? "127.0.0.1"), int.Parse(Environment.GetEnvironmentVariable("QUIC_LISTEN_PORT") ?? "4568")),
             ApplicationProtocols = Alpns,
             ConnectionOptionsCallback = (_, _, _) =>
                 ValueTask.FromResult(new QuicServerConnectionOptions
@@ -77,6 +77,7 @@ internal static class Program
 
         await using QuicConnection connection = await listener.AcceptConnectionAsync();
         Console.WriteLine("SERVER_CONNECTED");
+        Console.WriteLine($"SERVER_CLIENT_REMOTE={connection.RemoteEndPoint}");
 
         await using QuicStream stream = await connection.AcceptInboundStreamAsync();
         byte[] request = new byte[1024];
@@ -85,7 +86,7 @@ internal static class Program
         }
 
         byte[] payload = new byte[1000];
-        for (int i = 0; i < 40; i++)
+        for (int i = 0; i < 300; i++)
         {
             Random.Shared.NextBytes(payload);
             try
@@ -98,7 +99,7 @@ internal static class Program
                 return;
             }
 
-            await Task.Delay(75);
+            await Task.Delay(100);
         }
 
         stream.CompleteWrites();
@@ -112,7 +113,7 @@ internal static class Program
         {
             DefaultStreamErrorCode = 0x200,
             DefaultCloseErrorCode = 0x201,
-            RemoteEndPoint = new IPEndPoint(IPAddress.Parse(Environment.GetEnvironmentVariable("QUIC_REMOTE_IP") ?? "127.0.0.1"), 4567),
+            RemoteEndPoint = new IPEndPoint(IPAddress.Parse(Environment.GetEnvironmentVariable("QUIC_REMOTE_IP") ?? "127.0.0.1"), int.Parse(Environment.GetEnvironmentVariable("QUIC_REMOTE_PORT") ?? "4567")),
             ClientAuthenticationOptions = new SslClientAuthenticationOptions
             {
                 TargetHost = "localhost",
@@ -122,6 +123,7 @@ internal static class Program
 
         await using QuicConnection connection = await QuicConnection.ConnectAsync(clientOptions);
         Console.WriteLine($"CLIENT_CONNECTED={connection.RemoteEndPoint}");
+        Console.WriteLine($"CLIENT_LOCAL={connection.LocalEndPoint}");
 
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(markerPath))!);
         File.WriteAllText(markerPath, DateTimeOffset.UtcNow.ToString("O"));
