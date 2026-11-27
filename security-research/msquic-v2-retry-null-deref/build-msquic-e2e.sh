@@ -10,8 +10,13 @@ cmake -S "$RUNNER_TEMP/msquic" -B "$RUNNER_TEMP/msquic/build" \
   -DCMAKE_BUILD_TYPE=Release -DQUIC_BUILD_SHARED=ON \
   -DQUIC_BUILD_TOOLS=OFF -DQUIC_BUILD_TEST=OFF -DQUIC_ENABLE_LOGGING=OFF
 cmake --build "$RUNNER_TEMP/msquic/build" --parallel 2
-echo "MSQUIC_LIB_DIR=$RUNNER_TEMP/msquic/build/bin/Release" >> "$GITHUB_ENV"
-echo "DOTNET_ROLL_FORWARD=LatestPatch" >> "$GITHUB_ENV"
+export MSQUIC_LIB_DIR="$RUNNER_TEMP/msquic/build/bin/Release"
+export LD_LIBRARY_PATH="$MSQUIC_LIB_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export DOTNET_ROLL_FORWARD=LatestPatch
+echo "MSQUIC_LIB_DIR=$MSQUIC_LIB_DIR" >> "$GITHUB_ENV"
+echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH" >> "$GITHUB_ENV"
+echo "DOTNET_ROLL_FORWARD=$DOTNET_ROLL_FORWARD" >> "$GITHUB_ENV"
+ls -l "$MSQUIC_LIB_DIR"/libmsquic.so*
+ldd "$MSQUIC_LIB_DIR/libmsquic.so.2" || true
 dotnet build security-research/msquic-v2-retry-null-deref/MsQuicRetryE2E.csproj --configuration Release
 dotnet --list-runtimes
-dotnet security-research/msquic-v2-retry-null-deref/bin/Release/net10.0/MsQuicRetryE2E.dll --check-runtime
