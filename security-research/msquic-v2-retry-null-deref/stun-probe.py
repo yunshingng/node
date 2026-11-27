@@ -2,7 +2,7 @@
 import json, os, socket, struct, sys, time
 
 local_port=int(sys.argv[1])
-servers=["stun.l.google.com","stun1.l.google.com","stun2.l.google.com"]
+servers=[("stun.l.google.com",19302),("stun.cloudflare.com",3478),("stun.nextcloud.com",443)]
 cookie=0x2112A442
 results=[]
 sock=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
@@ -28,8 +28,8 @@ def parse_response(data, txid):
             return socket.inet_ntoa(value[4:8]),struct.unpack("!H",value[2:4])[0]
     raise ValueError("no IPv4 MAPPED-ADDRESS attribute")
 
-for host in servers:
-    answers=socket.getaddrinfo(host,19302,socket.AF_INET,socket.SOCK_DGRAM)
+for host,port in servers:
+    answers=socket.getaddrinfo(host,port,socket.AF_INET,socket.SOCK_DGRAM)
     destination=answers[0][4]
     txid=os.urandom(12)
     request=struct.pack("!HHI12s",0x0001,0,cookie,txid)
@@ -40,7 +40,7 @@ for host in servers:
         try:
             data,peer=sock.recvfrom(2048)
             mapped=parse_response(data,txid)
-            results.append({"stun_server":host,"stun_ip":destination[0],"mapped_ip":mapped[0],"mapped_port":mapped[1]})
+            results.append({"stun_server":host,"stun_port":port,"stun_ip":destination[0],"mapped_ip":mapped[0],"mapped_port":mapped[1]})
             print(f"STUN {host} -> {mapped[0]}:{mapped[1]}",file=sys.stderr,flush=True)
             break
         except socket.timeout:
@@ -54,6 +54,8 @@ for host in servers:
         raise SystemExit(f"STUN failed for {host}: {last}")
 
 sock.close()
+if len({x["stun_ip"] for x in results}) != len(results):
+    raise SystemExit("FAIL: STUN probes did not reach distinct server IPv4 addresses; NAT mapping comparison is invalid")
 endpoints={(x["mapped_ip"],x["mapped_port"]) for x in results}
 if len(endpoints)!=1:
     print(json.dumps({"local_port":local_port,"results":results,"mapping_consistent":False},indent=2))
