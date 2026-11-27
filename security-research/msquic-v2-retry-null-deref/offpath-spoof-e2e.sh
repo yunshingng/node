@@ -93,7 +93,7 @@ p=sys.argv[1]
 for _ in range(100):
     try: s=open(p).read()
     except OSError: s=""
-    m=re.search(r"C2S bytes=\\d+ client=\\('10\\.200\\.0\\.2', (\\d+)\\)",s)
+    m=re.search(r"C2S bytes=\d+ client=\('10\.200\.0\.2', (\d+)\)",s)
     if m:
         print(m.group(1)); raise SystemExit(0)
     time.sleep(.05)
@@ -111,7 +111,7 @@ s=socket.socket(socket.AF_PACKET,socket.SOCK_RAW,socket.htons(0x0800))
 s.bind(("eth0",0))
 while True:
     frame=s.recv(65535)
-    if len(frame)<42 or frame[12:14]!=b"\\x08\\x00": continue
+    if len(frame)<42 or frame[12:14]!=b"\x08\x00": continue
     ip=frame[14:]
     ihl=(ip[0]&15)*4
     if ip[9]!=17: continue
@@ -121,7 +121,7 @@ while True:
     payload=udp[8:length]
     if (src=="10.200.0.1" and dst=="10.200.0.2" and sport==4567
         and dport==port and payload==bytes.fromhex("806b3343cf0000")):
-        open(out,"w").write(f"received src={src}:{sport} dst={dst}:{dport} payload={payload.hex()}\\n")
+        open(out,"w").write(f"received src={src}:{sport} dst={dst}:{dport} payload={payload.hex()}\n")
         break
 PY
 SNIFFER_PID=$!
@@ -134,7 +134,7 @@ import socket,struct,sys
 src=socket.inet_aton("10.200.0.1"); dst=socket.inet_aton("10.200.0.2")
 sport=4567; dport=int(sys.argv[1]); payload=bytes.fromhex("806b3343cf0000")
 def csum(data):
-    if len(data)&1: data+=b"\\x00"
+    if len(data)&1: data+=b"\x00"
     words=struct.unpack("!%dH"%(len(data)//2),data)
     total=sum(words)
     while total>>16: total=(total&0xffff)+(total>>16)
