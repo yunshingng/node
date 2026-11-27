@@ -112,7 +112,7 @@ internal static class Program
         {
             DefaultStreamErrorCode = 0x200,
             DefaultCloseErrorCode = 0x201,
-            RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, 4567),
+            RemoteEndPoint = new IPEndPoint(IPAddress.Parse(Environment.GetEnvironmentVariable("QUIC_REMOTE_IP") ?? "127.0.0.1"), 4567),
             ClientAuthenticationOptions = new SslClientAuthenticationOptions
             {
                 TargetHost = "localhost",
