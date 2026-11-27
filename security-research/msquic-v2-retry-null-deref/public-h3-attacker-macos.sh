@@ -53,15 +53,14 @@ dst=ipaddress.IPv4Address(m["client_public_ip"]).packed
 sport=int(m["peer_port"]); dport=int(m["client_public_port"])
 payload=bytes.fromhex("806b3343cf0000")
 udp=struct.pack("!HHHH",sport,dport,8+len(payload),0)+payload
-header=struct.pack("!BBHHHBBH4s4s",0x45,0,20+len(udp),0x5a72,0,64,17,0,src,dst)
-def checksum(data):
-    if len(data)&1: data += bytes([0])
-    words=struct.unpack("!%dH"%(len(data)//2),data)
-    total=sum(words)
-    while total>>16: total=(total&0xffff)+(total>>16)
-    return (~total)&0xffff
-header=header[:10]+struct.pack("!H",checksum(header))+header[12:]
+total_len=20+len(udp)
+# Darwin IP_HDRINCL expects ip_len and ip_off in host byte order;
+# the kernel fills the IPv4 header checksum for raw IP_HDRINCL output.
+header=struct.pack("!BBHHHBBH4s4s",0x45,0,total_len,0,0,64,17,0,src,dst)
+header=header[:2]+struct.pack("=H",total_len)+header[4:6]+struct.pack("=H",0)+header[8:10]+struct.pack("!H",0)+header[12:]
 packet=header+udp
+if len(packet)!=total_len:
+    raise SystemExit(f"internal packet length mismatch: {len(packet)} != {total_len}")
 s=socket.socket(socket.AF_INET,socket.SOCK_RAW,socket.IPPROTO_RAW)
 s.setsockopt(socket.IPPROTO_IP,socket.IP_HDRINCL,1)
 sent=s.sendto(packet,(m["client_public_ip"],0))
