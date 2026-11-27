@@ -9,7 +9,7 @@ cat "$RESULTS/server.json" "$RESULTS/mapping.json"
 sudo tcpdump -U -ni any udp -w "$RESULTS/attacker-egress.pcap" >/dev/null 2>&1 &
 CAP_PID=$!
 sleep 1
-python3 - "$RESULTS/server.json" "$RESULTS/mapping.json" <<'PY' | tee "$RESULTS/attacker.log"
+sudo python3 - "$RESULTS/server.json" "$RESULTS/mapping.json" <<'PY' | tee "$RESULTS/attacker.log"
 import ipaddress,json,socket,struct,sys
 server=json.load(open(sys.argv[1])); target=json.load(open(sys.argv[2]))
 src=ipaddress.IPv4Address(server["server_ip"]).packed
