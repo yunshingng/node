@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   release-e2e:
-    name: .NET 10.0.15 Release + MsQuic main @ 3e870278
+    name: .NET 10.0.15 Release + MsQuic main @ aa31c3f
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
@@ -47,7 +47,7 @@ jobs:
         shell: bash
         run: |
           git clone --depth 1 --branch main --recurse-submodules https://github.com/microsoft/msquic.git "$RUNNER_TEMP/msquic"
-          test "$(git -C "$RUNNER_TEMP/msquic" rev-parse HEAD)" = "3e870278781a6d34524fc55c6bae220e182d6124"
+          test "$(git -C "$RUNNER_TEMP/msquic" rev-parse HEAD)" = "aa31c3f781a6d34524fc55c6bae220e182d6124"
           cmake -S "$RUNNER_TEMP/msquic" -B "$RUNNER_TEMP/msquic/build" \
             -DCMAKE_BUILD_TYPE=Release \
             -DQUIC_BUILD_SHARED=ON \
@@ -81,6 +81,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: msquic-v2-retry-e2e-logs-main-3e870278
+          name: msquic-v2-retry-e2e-logs-main-aa31c3f
           path: msquic-e2e-results/
           if-no-files-found: warn
