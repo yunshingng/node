@@ -1,0 +1,42 @@
+name: CAIDA Spoofer outbound source-validation diagnostic
+on:
+  push:
+    branches:
+      - security-research/msquic-v2-retry-e2e
+    paths:
+      - ".github/workflows/caida-spoofer-egress-diagnostic.yml"
+permissions:
+  contents: read
+jobs:
+  ubuntu:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Record network identity
+        run: |
+          echo "PUBLIC_IP=$(curl -4 -fsS https://api.ipify.org)"
+          ip -br addr
+          ip route
+      - name: Install official CAIDA Spoofer package
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y software-properties-common
+          sudo add-apt-repository -y ppa:spoofer-dev/spoofer
+          sudo apt-get update
+          apt-cache policy spoofer
+          sudo apt-get install -y spoofer
+      - name: Record Spoofer CLI and package contents
+        run: |
+          dpkg -L spoofer
+          command -v spoofer-prober
+          spoofer-prober --help 2>&1 | tee spoofer-help.txt || true
+          spoofer-prober --version 2>&1 | tee spoofer-version.txt || true
+      - name: Upload diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: caida-spoofer-egress-diagnostic
+          path: |
+            spoofer-help.txt
+            spoofer-version.txt
+          if-no-files-found: warn
