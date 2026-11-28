@@ -12,7 +12,7 @@ if not mapping_path.exists():
     raise SystemExit("TIMEOUT waiting for published target mapping")
 
 m = json.loads(mapping_path.read_text())
-attacker_ip = subprocess.check_output(["curl", "-4", "-fsS", "https://api.ipify.org"], text=True).strip()
+attacker_ip = subprocess.run(["curl", "-4", "--connect-timeout", "5", "--max-time", "10", "-fsS", "https://api.ipify.org"], capture_output=True, text=True, timeout=15).stdout.strip() or "UNKNOWN"
 if attacker_ip in (m["client_public_ip"], m["peer_ip"]):
     raise SystemExit("FAIL: attacker, target, and peer must have distinct public IPs")
 
