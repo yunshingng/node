@@ -62,8 +62,6 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           python3 security-research/msquic-v2-retry-null-deref/nettest-coord.py wait exact-stun-mapping offpath-stun-results/mapping.json 240
-          TARGET_IP="$(python3 -c 'import json;print(json.load(open("offpath-stun-results/mapping.json"))["client_public_ip"])')"
-          sudo tcpdump -U -ni any "udp and dst host $TARGET_IP" -w offpath-stun-results/attacker-egress.pcap >/tmp/attacker-tcpdump.log 2>&1 &
           sleep 1
           sudo python3 security-research/msquic-v2-retry-null-deref/offpath-stun-attacker.py
           sleep 1
