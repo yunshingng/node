@@ -38,7 +38,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: offpath-stun-target-evidence
-          path: offpath-stun-results/
+          path: |
+            offpath-stun-results/
+            target-inbound.pcap
           if-no-files-found: warn
   attacker:
     name: Independent off-path sender (runner B)
@@ -60,7 +62,8 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           python3 security-research/msquic-v2-retry-null-deref/nettest-coord.py wait exact-stun-mapping offpath-stun-results/mapping.json 240
-          sudo tcpdump -U -ni any "udp and dst host $(python3 -c \"import json;print(json.load(open(\x27offpath-stun-results/mapping.json\x27))[\x27client_public_ip\x27])\")" -w offpath-stun-results/attacker-egress.pcap >/tmp/attacker-tcpdump.log 2>&1 &
+          TARGET_IP="$(python3 -c 'import json;print(json.load(open("offpath-stun-results/mapping.json"))["client_public_ip"])')"
+          sudo tcpdump -U -ni any "udp and dst host $TARGET_IP" -w offpath-stun-results/attacker-egress.pcap >/tmp/attacker-tcpdump.log 2>&1 &
           sleep 1
           sudo python3 security-research/msquic-v2-retry-null-deref/offpath-stun-attacker.py
           sleep 1
