@@ -1,0 +1,1 @@
+{"peer_host":"cloudflare-quic.com","peer_ip":"104.18.27.14","peer_port":443,"client_public_ip":"3.42.157.143","client_public_ports_from_stun":[25040,38123,60023],"client_local_port":45678,"mapping_ip_consistent":true,"attack_mode":"full_udp_destination_port_sweep_1_65535"}
