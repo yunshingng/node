@@ -29,7 +29,7 @@ jobs:
         run: |
           set -o pipefail
           echo "PUBLIC_IP=$(curl -4 -fsS https://api.ipify.org)"
-          sudo timeout 180s spoofer-prober -4 -1 -v -s0 -r0 2>&1 | tee spoofer-run.log
+          sudo timeout -k 5s 180s spoofer-prober -4 -1 -v -s0 -r0 2>&1 | tee spoofer-run.log
       - name: Record Spoofer version
         if: always()
         run: spoofer-prober --version 2>&1 | tee spoofer-version.txt || true
