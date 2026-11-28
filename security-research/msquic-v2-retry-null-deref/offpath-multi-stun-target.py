@@ -42,7 +42,7 @@ def parse_stun(data, txid):
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind(("0.0.0.0", LOCAL_PORT))
-sock.settimeout(0.25)
+sock.settimeout(0.5)
 
 seen_destinations = set()
 mappings = []
@@ -69,7 +69,7 @@ for host, port in SERVERS:
                 try:
                     data, peer = sock.recvfrom(2048)
                 except socket.timeout:
-                    break
+                    continue
                 try:
                     mapped = parse_stun(data, txid)
                 except ValueError:
