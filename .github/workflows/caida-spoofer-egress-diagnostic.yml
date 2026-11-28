@@ -42,3 +42,37 @@ jobs:
             spoofer-run.log
             spoofer-version.txt
           if-no-files-found: warn
+
+  macos:
+    runs-on: macos-15-intel
+    timeout-minutes: 10
+    steps:
+      - name: Record network identity
+        run: |
+          echo "PUBLIC_IP=$(curl -4 -fsS https://api.ipify.org)"
+          route -n get default
+      - name: Download and install signed CAIDA Spoofer 1.5.0 package
+        run: |
+          curl -fL --retry 3 --retry-delay 2 -o spoofer.pkg https://www.caida.org/projects/spoofer/downloads/Spoofer-1.5.0-macos.pkg
+          shasum -a 256 spoofer.pkg | tee spoofer-package.sha256
+          sudo installer -pkg spoofer.pkg -target /
+      - name: Run CAIDA IPv4 source-validation probes
+        run: |
+          set -o pipefail
+          PROBER="$(sudo find /Applications /usr/local /opt -type f -name spoofer-prober -print -quit 2>/dev/null)"
+          if [ -z "$PROBER" ]; then
+            echo "spoofer-prober not found after signed package installation"
+            pkgutil --pkgs | grep -i spoofer || true
+            exit 1
+          fi
+          echo "PROBER=$PROBER"
+          sudo timeout 180s "$PROBER" -4 -1 -v -s0 -r0 2>&1 | tee spoofer-run-macos.log
+      - name: Upload macOS diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: caida-spoofer-egress-diagnostic-macos
+          path: |
+            spoofer-run-macos.log
+            spoofer-package.sha256
+          if-no-files-found: warn
