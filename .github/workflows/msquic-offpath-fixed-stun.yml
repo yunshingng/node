@@ -1,0 +1,73 @@
+name: Fixed-IP multi-peer off-path delivery proof
+on:
+  push:
+    branches:
+      - security-research/msquic-v2-retry-e2e
+    paths:
+      - "security-research/msquic-v2-retry-null-deref/offpath-fixed-stun-*.py"
+      - "security-research/msquic-v2-retry-null-deref/nettest-coord.py"
+      - ".github/workflows/msquic-offpath-fixed-stun.yml"
+permissions:
+  contents: write
+env:
+  COORD_BRANCH: security-research/msquic-offpath-nettest-coordination
+jobs:
+  target:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - name: Checkout scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            security-research/msquic-v2-retry-null-deref
+          sparse-checkout-cone-mode: true
+      - name: Install tcpdump
+        run: sudo apt-get update && sudo apt-get install -y tcpdump
+      - name: Capture UDP target
+        run: sudo tcpdump -U -ni any "udp and dst port 45679" -w fixed-target.pcap >/tmp/fixed-target-capture.log 2>&1 &
+      - name: Obtain exact peer mappings and wait
+        env:
+          GITHUB_TOKEN: \${{ github.token }}
+          LOCAL_PORT: "45679"
+        run: python3 security-research/msquic-v2-retry-null-deref/offpath-fixed-stun-target.py
+      - name: Upload target evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offpath-fixed-target
+          path: |
+            offpath-fixed-results/
+            fixed-target.pcap
+          if-no-files-found: warn
+  attacker-macos:
+    runs-on: macos-15-intel
+    timeout-minutes: 8
+    steps:
+      - name: Checkout scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            security-research/msquic-v2-retry-null-deref
+          sparse-checkout-cone-mode: true
+      - name: Install Scapy
+        run: |
+          python3 -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/python -m pip install scapy
+      - name: Wait for mapping and send one datagram per peer
+        env:
+          GITHUB_TOKEN: \${{ github.token }}
+        run: |
+          mkdir -p offpath-fixed-results
+          python3 security-research/msquic-v2-retry-null-deref/nettest-coord.py wait exact-fixed-stun-mappings offpath-fixed-results/mappings.json 240
+          sudo .venv/bin/python security-research/msquic-v2-retry-null-deref/offpath-fixed-stun-attacker-macos.py
+      - name: Upload sender evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offpath-fixed-attacker
+          path: offpath-fixed-results/
+          if-no-files-found: warn
