@@ -1,0 +1,167 @@
+{
+  "local_port": 45679,
+  "run_id": "46133109164",
+  "mappings": [
+    {
+      "configured_host": "stun.l.google.com",
+      "configured_destination": "74.125.250.129:19302",
+      "actual_reply_peer": "74.125.250.129:19302",
+      "peer_ip": "74.125.250.129",
+      "peer_port": 19302,
+      "mapped_ip": "20.51.199.196",
+      "mapped_port": 13344,
+      "local_port": 45679,
+      "run_id": "46133109164"
+    },
+    {
+      "configured_host": "stun.cloudflare.com",
+      "configured_destination": "162.159.207.0:3478",
+      "actual_reply_peer": "162.159.207.0:3478",
+      "peer_ip": "162.159.207.0",
+      "peer_port": 3478,
+      "mapped_ip": "20.51.199.196",
+      "mapped_port": 13344,
+      "local_port": 45679,
+      "run_id": "46133109164"
+    },
+    {
+      "configured_host": "stun.nextcloud.com",
+      "configured_destination": "46.225.95.169:443",
+      "actual_reply_peer": "46.225.95.169:443",
+      "peer_ip": "46.225.95.169",
+      "peer_port": 443,
+      "mapped_ip": "20.51.199.196",
+      "mapped_port": 13344,
+      "local_port": 45679,
+      "run_id": "46133109164"
+    },
+    {
+      "configured_host": "stun.sonetel.net",
+      "configured_destination": "52.24.174.49:3478",
+      "actual_reply_peer": "52.24.174.49:3478",
+      "peer_ip": "52.24.174.49",
+      "peer_port": 3478,
+      "mapped_ip": "20.51.199.196",
+      "mapped_port": 13344,
+      "local_port": 45679,
+      "run_id": "46133109164"
+    },
+    {
+      "configured_host": "stun.sonetel.net",
+      "configured_destination": "52.26.251.34:3478",
+      "actual_reply_peer": "52.26.251.34:3478",
+      "peer_ip": "52.26.251.34",
+      "peer_port": 3478,
+      "mapped_ip": "20.51.199.196",
+      "mapped_port": 13344,
+      "local_port": 45679,
+      "run_id": "46133109164"
+    },
+    {
+      "configured_host": "stun.sipnet.ru",
+      "configured_destination": "212.53.40.43:3478",
+      "actual_reply_peer": "212.53.40.43:3478",
+      "peer_ip": "212.53.40.43",
+      "peer_port": 3478,
+      "mapped_ip": "20.51.199.196",
+      "mapped_port": 13344,
+      "local_port": 45679,
+      "run_id": "46133109164"
+    },
+    {
+      "configured_host": "stun.voipbuster.com",
+      "configured_destination": "77.72.169.212:3478",
+      "actual_reply_peer": "77.72.169.212:3478",
+      "peer_ip": "77.72.169.212",
+      "peer_port": 3478,
+      "mapped_ip": "20.51.199.196",
+      "mapped_port": 13344,
+      "local_port": 45679,
+      "run_id": "46133109164"
+    },
+    {
+      "configured_host": "stun.voipbuster.com",
+      "configured_destination": "77.72.169.213:3478",
+      "actual_reply_peer": "77.72.169.213:3478",
+      "peer_ip": "77.72.169.213",
+      "peer_port": 3478,
+      "mapped_ip": "20.51.199.196",
+      "mapped_port": 13344,
+      "local_port": 45679,
+      "run_id": "46133109164"
+    },
+    {
+      "configured_host": "stun.voipbuster.com",
+      "configured_destination": "77.72.169.210:3478",
+      "actual_reply_peer": "77.72.169.210:3478",
+      "peer_ip": "77.72.169.210",
+      "peer_port": 3478,
+      "mapped_ip": "20.51.199.196",
+      "mapped_port": 13344,
+      "local_port": 45679,
+      "run_id": "46133109164"
+    },
+    {
+      "configured_host": "stun.voipbuster.com",
+      "configured_destination": "77.72.169.211:3478",
+      "actual_reply_peer": "77.72.169.211:3478",
+      "peer_ip": "77.72.169.211",
+      "peer_port": 3478,
+      "mapped_ip": "20.51.199.196",
+      "mapped_port": 13344,
+      "local_port": 45679,
+      "run_id": "46133109164"
+    },
+    {
+      "configured_host": "stun.voip.eutelia.it",
+      "configured_destination": "83.211.9.232:3478",
+      "actual_reply_peer": "83.211.9.232:3478",
+      "peer_ip": "83.211.9.232",
+      "peer_port": 3478,
+      "mapped_ip": "20.51.199.196",
+      "mapped_port": 13344,
+      "local_port": 45679,
+      "run_id": "46133109164"
+    },
+    {
+      "configured_host": "stun.linuxtrent.it",
+      "configured_destination": "136.243.59.79:3478",
+      "actual_reply_peer": "136.243.59.79:3478",
+      "peer_ip": "136.243.59.79",
+      "peer_port": 3478,
+      "mapped_ip": "20.51.199.196",
+      "mapped_port": 13344,
+      "local_port": 45679,
+      "run_id": "46133109164"
+    },
+    {
+      "configured_host": "stun.framasoft.org",
+      "configured_destination": "51.15.210.80:3478",
+      "actual_reply_peer": "51.15.210.80:3478",
+      "peer_ip": "51.15.210.80",
+      "peer_port": 3478,
+      "mapped_ip": "20.51.199.196",
+      "mapped_port": 13344,
+      "local_port": 45679,
+      "run_id": "46133109164"
+    }
+  ],
+  "failures": [
+    {
+      "host": "stun.ekiga.net",
+      "destination": "141.193.213.21:3478",
+      "error": "no matching Binding Success"
+    },
+    {
+      "host": "stun.ekiga.net",
+      "destination": "141.193.213.20:3478",
+      "error": "no matching Binding Success"
+    },
+    {
+      "host": "stun.callwithus.com",
+      "destination": "158.69.57.20:3478",
+      "error": "no matching Binding Success"
+    }
+  ],
+  "note": "Each peer tuple is the exact source IP:port from a Binding Success received on the same still-open socket; each mapped address/port is learned from that reply."
+}
