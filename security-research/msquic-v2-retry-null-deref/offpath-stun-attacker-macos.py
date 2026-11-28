@@ -29,18 +29,27 @@ header = struct.pack("!BBHHHBBH4s4s", 0x45, 0, total_len, 0x4D53, 0, 64, 17, 0, 
 header = bytearray(header)
 header[2:4] = struct.pack("=H", total_len)
 header[4:6] = struct.pack("=H", 0)
-header[10:12] = b"\\x00\\x00"
+header[10:12] = b"\x00\x00"
 
 def ip_checksum(data):
     if len(data) & 1:
-        data += b"\\x00"
+        data += b"\x00"
     total = sum(struct.unpack("!%dH" % (len(data) // 2), data))
     while total >> 16:
         total = (total & 0xffff) + (total >> 16)
     return (~total) & 0xffff
 
-header[10:12] = struct.pack("!H", ip_checksum(bytes(header)))
+# Compute checksum over the on-wire (network-byte-order) header.
+wire_header = bytearray(header)
+wire_header[2:4] = struct.pack("!H", total_len)
+wire_header[4:6] = struct.pack("!H", 0)
+wire_header[10:12] = b"\x00\x00"
+header[10:12] = struct.pack("!H", ip_checksum(bytes(wire_header)))
+if len(header) != 20:
+    raise SystemExit(f"invalid IPv4 header length: {len(header)}")
 packet = bytes(header) + udp
+if len(packet) != total_len:
+    raise SystemExit(f"invalid datagram length: {len(packet)} != {total_len}")
 
 identity = {
     "attacker_public_ip": attacker_ip,
