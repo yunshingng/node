@@ -33,15 +33,15 @@ def publish(name, source):
 
 def wait_file(name, output, timeout=300):
     path = f"{ROOT}/{name}"
-    branch = urllib.parse.quote(BRANCH, safe="")
-    url = f"https://api.github.com/repos/{REPO}/contents/{path}?ref={branch}"
+    branch = urllib.parse.quote(BRANCH, safe="/")
+    url = f"https://raw.githubusercontent.com/{REPO}/{branch}/{path}"
     deadline = time.time() + timeout
     last = None
     while time.time() < deadline:
         try:
-            with request(url) as r:
-                item = json.loads(r.read())
-            data = base64.b64decode(item["content"])
+            req = urllib.request.Request(url, headers={"User-Agent": "msquic-offpath-validation"})
+            with urllib.request.urlopen(req, timeout=20) as r:
+                data = r.read()
             pathlib.Path(output).parent.mkdir(parents=True, exist_ok=True)
             pathlib.Path(output).write_bytes(data)
             print(f"RECEIVED={path} bytes={len(data)}", flush=True)
