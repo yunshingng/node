@@ -1,0 +1,127 @@
+{
+  "run_id": "46133113259",
+  "local_port": 45679,
+  "mappings": [
+    {
+      "name": "google-stun",
+      "peer_ip": "74.125.250.129",
+      "peer_port": 19302,
+      "mapped_ip": "3.41.210.68",
+      "mapped_port": 55392,
+      "local_port": 45679
+    },
+    {
+      "name": "cloudflare-turn",
+      "peer_ip": "141.101.90.1",
+      "peer_port": 443,
+      "mapped_ip": "3.41.210.68",
+      "mapped_port": 4073,
+      "local_port": 45679
+    },
+    {
+      "name": "sonetel",
+      "peer_ip": "195.201.132.113",
+      "peer_port": 3478,
+      "mapped_ip": "3.41.210.68",
+      "mapped_port": 62245,
+      "local_port": 45679
+    },
+    {
+      "name": "aws-stun",
+      "peer_ip": "52.26.251.34",
+      "peer_port": 3478,
+      "mapped_ip": "3.41.210.68",
+      "mapped_port": 65072,
+      "local_port": 45679
+    },
+    {
+      "name": "oracle-stun",
+      "peer_ip": "129.153.212.128",
+      "peer_port": 3478,
+      "mapped_ip": "3.41.210.68",
+      "mapped_port": 32118,
+      "local_port": 45679
+    },
+    {
+      "name": "eutelia-stun",
+      "peer_ip": "83.211.9.232",
+      "peer_port": 3478,
+      "mapped_ip": "3.41.210.68",
+      "mapped_port": 50798,
+      "local_port": 45679
+    },
+    {
+      "name": "hetzner-stun",
+      "peer_ip": "136.243.59.79",
+      "peer_port": 3478,
+      "mapped_ip": "3.41.210.68",
+      "mapped_port": 65394,
+      "local_port": 45679
+    },
+    {
+      "name": "1und1-stun",
+      "peer_ip": "212.227.67.33",
+      "peer_port": 3478,
+      "mapped_ip": "3.41.210.68",
+      "mapped_port": 23616,
+      "local_port": 45679
+    },
+    {
+      "name": "ippi-stun",
+      "peer_ip": "194.169.214.30",
+      "peer_port": 3478,
+      "mapped_ip": "3.41.210.68",
+      "mapped_port": 64013,
+      "local_port": 45679
+    },
+    {
+      "name": "logic-ky-stun",
+      "peer_ip": "216.144.89.2",
+      "peer_port": 3478,
+      "mapped_ip": "3.41.210.68",
+      "mapped_port": 64699,
+      "local_port": 45679
+    },
+    {
+      "name": "aws-east-stun",
+      "peer_ip": "34.197.205.39",
+      "peer_port": 3478,
+      "mapped_ip": "3.41.210.68",
+      "mapped_port": 35822,
+      "local_port": 45679
+    },
+    {
+      "name": "zadarma-stun",
+      "peer_ip": "185.45.152.22",
+      "peer_port": 3478,
+      "mapped_ip": "3.41.210.68",
+      "mapped_port": 41708,
+      "local_port": 45679
+    },
+    {
+      "name": "hetzner-stun-alt",
+      "peer_ip": "5.161.57.75",
+      "peer_port": 3478,
+      "mapped_ip": "3.41.210.68",
+      "mapped_port": 18650,
+      "local_port": 45679
+    },
+    {
+      "name": "goldfish-stun",
+      "peer_ip": "185.112.247.26",
+      "peer_port": 3478,
+      "mapped_ip": "3.41.210.68",
+      "mapped_port": 44142,
+      "local_port": 45679
+    },
+    {
+      "name": "gcp-stun",
+      "peer_ip": "34.74.124.204",
+      "peer_port": 3478,
+      "mapped_ip": "3.41.210.68",
+      "mapped_port": 3410,
+      "local_port": 45679
+    }
+  ],
+  "failures": []
+}
