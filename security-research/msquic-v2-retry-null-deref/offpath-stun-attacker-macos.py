@@ -26,8 +26,21 @@ total_len = 20 + len(udp)
 
 # Darwin IP_HDRINCL expects ip_len and ip_off as host-endian fields.
 header = struct.pack("!BBHHHBBH4s4s", 0x45, 0, total_len, 0x4D53, 0, 64, 17, 0, src, dst)
-header = header[:2] + struct.pack("=H", total_len) + header[4:6] + struct.pack("=H", 0) + header[8:10] + struct.pack("!H", 0) + header[12:]
-packet = header + udp
+header = bytearray(header)
+header[2:4] = struct.pack("=H", total_len)
+header[4:6] = struct.pack("=H", 0)
+header[10:12] = b"\\x00\\x00"
+
+def ip_checksum(data):
+    if len(data) & 1:
+        data += b"\\x00"
+    total = sum(struct.unpack("!%dH" % (len(data) // 2), data))
+    while total >> 16:
+        total = (total & 0xffff) + (total >> 16)
+    return (~total) & 0xffff
+
+header[10:12] = struct.pack("!H", ip_checksum(bytes(header)))
+packet = bytes(header) + udp
 
 identity = {
     "attacker_public_ip": attacker_ip,
