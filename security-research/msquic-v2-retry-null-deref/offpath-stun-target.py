@@ -61,8 +61,8 @@ print("EXACT_PUBLIC_MAPPING=%s:%d" % (mapped_ip, mapped_port), flush=True)
 
 # Publish only after the same socket received the STUN reply; keep this socket open.
 os.system("python3 security-research/msquic-v2-retry-null-deref/nettest-coord.py publish exact-stun-mapping offpath-stun-results/mapping.json")
-sock.settimeout(55)
-deadline = time.time() + 55
+sock.settimeout(180)
+deadline = time.time() + 180
 while time.time() < deadline:
     try:
         packet, source = sock.recvfrom(2048)
