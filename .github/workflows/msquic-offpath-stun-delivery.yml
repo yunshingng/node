@@ -92,16 +92,7 @@ jobs:
         run: |
           mkdir -p offpath-stun-results
           python3 security-research/msquic-v2-retry-null-deref/nettest-coord.py wait exact-stun-mapping offpath-stun-results/mapping.json 240
-          TARGET_IP="$(python3 -c 'import json;print(json.load(open("offpath-stun-results/mapping.json"))["client_public_ip"])')"
-          IFACE="$(route -n get default | awk '/interface:/{print $2; exit}')"
-          sudo tcpdump -U -ni "$IFACE" "udp and dst host $TARGET_IP" -w offpath-stun-results/attacker-egress.pcap >/tmp/mac-attacker-tcpdump.log 2>&1 &
-          CAP_PID=$!
-          sleep 1
           sudo python3 security-research/msquic-v2-retry-null-deref/offpath-stun-attacker-macos.py
-          sleep 1
-          sudo kill -INT "$CAP_PID" 2>/dev/null || true
-          wait "$CAP_PID" 2>/dev/null || true
-          tcpdump -nn -r offpath-stun-results/attacker-egress.pcap -c 10 > offpath-stun-results/attacker-egress.txt 2>&1 || true
 
       - name: Upload sender evidence
         if: always()
