@@ -1,0 +1,75 @@
+name: Multi-peer exact NAT tuple off-path delivery test
+on:
+  push:
+    branches:
+      - security-research/msquic-v2-retry-e2e
+    paths:
+      - "security-research/msquic-v2-retry-null-deref/offpath-multi-stun-*.py"
+      - "security-research/msquic-v2-retry-null-deref/nettest-coord.py"
+      - ".github/workflows/msquic-offpath-multi-stun.yml"
+permissions:
+  contents: write
+env:
+  COORD_BRANCH: security-research/msquic-offpath-nettest-coordination
+jobs:
+  target:
+    name: Controlled UDP target with multiple STUN peers
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - name: Checkout scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            security-research/msquic-v2-retry-null-deref
+          sparse-checkout-cone-mode: true
+      - name: Install packet capture
+        run: sudo apt-get update && sudo apt-get install -y tcpdump
+      - name: Capture UDP target traffic
+        run: sudo tcpdump -U -ni any "udp and dst port 45679" -w target-multi-inbound.pcap >/tmp/target-tcpdump.log 2>&1 &
+      - name: Learn all exact peer-specific mappings and wait for markers
+        env:
+          GITHUB_TOKEN: \${{ github.token }}
+          LOCAL_PORT: "45679"
+        run: python3 security-research/msquic-v2-retry-null-deref/offpath-multi-stun-target.py
+      - name: Upload target evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offpath-multi-target-evidence
+          path: |
+            offpath-multi-results/
+            target-multi-inbound.pcap
+          if-no-files-found: warn
+  attacker-macos:
+    name: CAIDA-capable macOS L2 spoof sender
+    runs-on: macos-15-intel
+    timeout-minutes: 8
+    steps:
+      - name: Checkout scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            security-research/msquic-v2-retry-null-deref
+          sparse-checkout-cone-mode: true
+      - name: Install Scapy in isolated venv
+        run: |
+          python3 -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/python -m pip install scapy
+      - name: Send one packet to each exact peer mapping
+        env:
+          GITHUB_TOKEN: \${{ github.token }}
+        run: |
+          mkdir -p offpath-multi-results
+          python3 security-research/msquic-v2-retry-null-deref/nettest-coord.py wait exact-stun-mappings offpath-multi-results/mappings.json 240
+          sudo .venv/bin/python security-research/msquic-v2-retry-null-deref/offpath-multi-stun-attacker-macos.py
+      - name: Upload sender evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offpath-multi-attacker-evidence
+          path: offpath-multi-results/
+          if-no-files-found: warn
