@@ -86,15 +86,18 @@ jobs:
           sparse-checkout: |
             security-research/msquic-v2-retry-null-deref
           sparse-checkout-cone-mode: true
-      - name: Install Scapy for L2 packet injection
-        run: python3 -m pip install --user scapy
+      - name: Install Scapy in isolated virtual environment
+        run: |
+          python3 -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/python -m pip install scapy
       - name: Wait for exact target mapping and send one forged-source L2 datagram
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           mkdir -p offpath-stun-results
           python3 security-research/msquic-v2-retry-null-deref/nettest-coord.py wait exact-stun-mapping offpath-stun-results/mapping.json 240
-          sudo python3 security-research/msquic-v2-retry-null-deref/offpath-stun-attacker-macos.py
+          sudo .venv/bin/python security-research/msquic-v2-retry-null-deref/offpath-stun-attacker-macos.py
       - name: Upload macOS sender evidence
         if: always()
         uses: actions/upload-artifact@v4
