@@ -29,7 +29,7 @@ jobs:
         run: sudo tcpdump -U -ni any "udp and dst port 45679" -w fixed-target.pcap >/tmp/fixed-target-capture.log 2>&1 &
       - name: Obtain exact peer mappings and wait
         env:
-          GITHUB_TOKEN: \${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
           LOCAL_PORT: "45679"
         run: python3 security-research/msquic-v2-retry-null-deref/offpath-fixed-stun-target.py
       - name: Upload target evidence
@@ -59,7 +59,7 @@ jobs:
           .venv/bin/python -m pip install scapy
       - name: Wait for mapping and send one datagram per peer
         env:
-          GITHUB_TOKEN: \${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           mkdir -p offpath-fixed-results
           python3 security-research/msquic-v2-retry-null-deref/nettest-coord.py wait exact-fixed-stun-mappings offpath-fixed-results/mappings.json 240
