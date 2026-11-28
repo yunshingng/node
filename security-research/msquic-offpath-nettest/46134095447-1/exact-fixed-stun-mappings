@@ -1,0 +1,382 @@
+{
+  "run_id": "46134095447",
+  "local_port": 45679,
+  "confirmed_stun_mappings": 15,
+  "inferred_caida_source_mappings": [
+    {
+      "name": "caida-confirmed-192.172.226.159-3478",
+      "peer_ip": "192.172.226.159",
+      "peer_port": 3478,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679,
+      "mapping_basis": "inferred: identical endpoint-independent mapping observed across 15 successful STUN peers",
+      "no_stun_reply": true
+    },
+    {
+      "name": "caida-confirmed-192.172.226.159-19302",
+      "peer_ip": "192.172.226.159",
+      "peer_port": 19302,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679,
+      "mapping_basis": "inferred: identical endpoint-independent mapping observed across 15 successful STUN peers",
+      "no_stun_reply": true
+    },
+    {
+      "name": "caida-confirmed-6.1.2.3-3478",
+      "peer_ip": "6.1.2.3",
+      "peer_port": 3478,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679,
+      "mapping_basis": "inferred: identical endpoint-independent mapping observed across 15 successful STUN peers",
+      "no_stun_reply": true
+    },
+    {
+      "name": "caida-confirmed-6.1.2.3-19302",
+      "peer_ip": "6.1.2.3",
+      "peer_port": 19302,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679,
+      "mapping_basis": "inferred: identical endpoint-independent mapping observed across 15 successful STUN peers",
+      "no_stun_reply": true
+    },
+    {
+      "name": "caida-confirmed-13.105.101.55-3478",
+      "peer_ip": "13.105.101.55",
+      "peer_port": 3478,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679,
+      "mapping_basis": "inferred: identical endpoint-independent mapping observed across 15 successful STUN peers",
+      "no_stun_reply": true
+    },
+    {
+      "name": "caida-confirmed-13.105.101.55-19302",
+      "peer_ip": "13.105.101.55",
+      "peer_port": 19302,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679,
+      "mapping_basis": "inferred: identical endpoint-independent mapping observed across 15 successful STUN peers",
+      "no_stun_reply": true
+    },
+    {
+      "name": "caida-confirmed-13.105.116.55-3478",
+      "peer_ip": "13.105.116.55",
+      "peer_port": 3478,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679,
+      "mapping_basis": "inferred: identical endpoint-independent mapping observed across 15 successful STUN peers",
+      "no_stun_reply": true
+    },
+    {
+      "name": "caida-confirmed-13.105.116.55-19302",
+      "peer_ip": "13.105.116.55",
+      "peer_port": 19302,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679,
+      "mapping_basis": "inferred: identical endpoint-independent mapping observed across 15 successful STUN peers",
+      "no_stun_reply": true
+    },
+    {
+      "name": "caida-confirmed-13.105.125.55-3478",
+      "peer_ip": "13.105.125.55",
+      "peer_port": 3478,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679,
+      "mapping_basis": "inferred: identical endpoint-independent mapping observed across 15 successful STUN peers",
+      "no_stun_reply": true
+    },
+    {
+      "name": "caida-confirmed-13.105.125.55-19302",
+      "peer_ip": "13.105.125.55",
+      "peer_port": 19302,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679,
+      "mapping_basis": "inferred: identical endpoint-independent mapping observed across 15 successful STUN peers",
+      "no_stun_reply": true
+    }
+  ],
+  "mapping_endpoint_independent_observed": true,
+  "mappings": [
+    {
+      "name": "google-stun",
+      "peer_ip": "74.125.250.129",
+      "peer_port": 19302,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679
+    },
+    {
+      "name": "cloudflare-turn",
+      "peer_ip": "141.101.90.1",
+      "peer_port": 443,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679
+    },
+    {
+      "name": "sonetel",
+      "peer_ip": "195.201.132.113",
+      "peer_port": 3478,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679
+    },
+    {
+      "name": "aws-stun",
+      "peer_ip": "52.26.251.34",
+      "peer_port": 3478,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679
+    },
+    {
+      "name": "oracle-stun",
+      "peer_ip": "129.153.212.128",
+      "peer_port": 3478,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679
+    },
+    {
+      "name": "eutelia-stun",
+      "peer_ip": "83.211.9.232",
+      "peer_port": 3478,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679
+    },
+    {
+      "name": "hetzner-stun",
+      "peer_ip": "136.243.59.79",
+      "peer_port": 3478,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679
+    },
+    {
+      "name": "1und1-stun",
+      "peer_ip": "212.227.67.33",
+      "peer_port": 3478,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679
+    },
+    {
+      "name": "ippi-stun",
+      "peer_ip": "194.169.214.30",
+      "peer_port": 3478,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679
+    },
+    {
+      "name": "logic-ky-stun",
+      "peer_ip": "216.144.89.2",
+      "peer_port": 3478,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679
+    },
+    {
+      "name": "aws-east-stun",
+      "peer_ip": "34.197.205.39",
+      "peer_port": 3478,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679
+    },
+    {
+      "name": "zadarma-stun",
+      "peer_ip": "185.45.152.22",
+      "peer_port": 3478,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679
+    },
+    {
+      "name": "hetzner-stun-alt",
+      "peer_ip": "5.161.57.75",
+      "peer_port": 3478,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679
+    },
+    {
+      "name": "goldfish-stun",
+      "peer_ip": "185.112.247.26",
+      "peer_port": 3478,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679
+    },
+    {
+      "name": "gcp-stun",
+      "peer_ip": "34.74.124.204",
+      "peer_port": 3478,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679
+    },
+    {
+      "name": "caida-confirmed-192.172.226.159-3478",
+      "peer_ip": "192.172.226.159",
+      "peer_port": 3478,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679,
+      "mapping_basis": "inferred: identical endpoint-independent mapping observed across 15 successful STUN peers",
+      "no_stun_reply": true
+    },
+    {
+      "name": "caida-confirmed-192.172.226.159-19302",
+      "peer_ip": "192.172.226.159",
+      "peer_port": 19302,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679,
+      "mapping_basis": "inferred: identical endpoint-independent mapping observed across 15 successful STUN peers",
+      "no_stun_reply": true
+    },
+    {
+      "name": "caida-confirmed-6.1.2.3-3478",
+      "peer_ip": "6.1.2.3",
+      "peer_port": 3478,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679,
+      "mapping_basis": "inferred: identical endpoint-independent mapping observed across 15 successful STUN peers",
+      "no_stun_reply": true
+    },
+    {
+      "name": "caida-confirmed-6.1.2.3-19302",
+      "peer_ip": "6.1.2.3",
+      "peer_port": 19302,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679,
+      "mapping_basis": "inferred: identical endpoint-independent mapping observed across 15 successful STUN peers",
+      "no_stun_reply": true
+    },
+    {
+      "name": "caida-confirmed-13.105.101.55-3478",
+      "peer_ip": "13.105.101.55",
+      "peer_port": 3478,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679,
+      "mapping_basis": "inferred: identical endpoint-independent mapping observed across 15 successful STUN peers",
+      "no_stun_reply": true
+    },
+    {
+      "name": "caida-confirmed-13.105.101.55-19302",
+      "peer_ip": "13.105.101.55",
+      "peer_port": 19302,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679,
+      "mapping_basis": "inferred: identical endpoint-independent mapping observed across 15 successful STUN peers",
+      "no_stun_reply": true
+    },
+    {
+      "name": "caida-confirmed-13.105.116.55-3478",
+      "peer_ip": "13.105.116.55",
+      "peer_port": 3478,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679,
+      "mapping_basis": "inferred: identical endpoint-independent mapping observed across 15 successful STUN peers",
+      "no_stun_reply": true
+    },
+    {
+      "name": "caida-confirmed-13.105.116.55-19302",
+      "peer_ip": "13.105.116.55",
+      "peer_port": 19302,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679,
+      "mapping_basis": "inferred: identical endpoint-independent mapping observed across 15 successful STUN peers",
+      "no_stun_reply": true
+    },
+    {
+      "name": "caida-confirmed-13.105.125.55-3478",
+      "peer_ip": "13.105.125.55",
+      "peer_port": 3478,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679,
+      "mapping_basis": "inferred: identical endpoint-independent mapping observed across 15 successful STUN peers",
+      "no_stun_reply": true
+    },
+    {
+      "name": "caida-confirmed-13.105.125.55-19302",
+      "peer_ip": "13.105.125.55",
+      "peer_port": 19302,
+      "mapped_ip": "172.193.10.128",
+      "mapped_port": 37888,
+      "local_port": 45679,
+      "mapping_basis": "inferred: identical endpoint-independent mapping observed across 15 successful STUN peers",
+      "no_stun_reply": true
+    }
+  ],
+  "failures": [
+    {
+      "name": "caida-confirmed-192.172.226.159-3478",
+      "dest": "192.172.226.159:3478",
+      "error": "timeout/no-matching-success"
+    },
+    {
+      "name": "caida-confirmed-192.172.226.159-19302",
+      "dest": "192.172.226.159:19302",
+      "error": "timeout/no-matching-success"
+    },
+    {
+      "name": "caida-confirmed-6.1.2.3-3478",
+      "dest": "6.1.2.3:3478",
+      "error": "timeout/no-matching-success"
+    },
+    {
+      "name": "caida-confirmed-6.1.2.3-19302",
+      "dest": "6.1.2.3:19302",
+      "error": "timeout/no-matching-success"
+    },
+    {
+      "name": "caida-confirmed-13.105.101.55-3478",
+      "dest": "13.105.101.55:3478",
+      "error": "timeout/no-matching-success"
+    },
+    {
+      "name": "caida-confirmed-13.105.101.55-19302",
+      "dest": "13.105.101.55:19302",
+      "error": "timeout/no-matching-success"
+    },
+    {
+      "name": "caida-confirmed-13.105.116.55-3478",
+      "dest": "13.105.116.55:3478",
+      "error": "timeout/no-matching-success"
+    },
+    {
+      "name": "caida-confirmed-13.105.116.55-19302",
+      "dest": "13.105.116.55:19302",
+      "error": "timeout/no-matching-success"
+    },
+    {
+      "name": "caida-confirmed-13.105.125.55-3478",
+      "dest": "13.105.125.55:3478",
+      "error": "timeout/no-matching-success"
+    },
+    {
+      "name": "caida-confirmed-13.105.125.55-19302",
+      "dest": "13.105.125.55:19302",
+      "error": "timeout/no-matching-success"
+    }
+  ]
+}
