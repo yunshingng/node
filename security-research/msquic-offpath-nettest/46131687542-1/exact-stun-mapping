@@ -1,0 +1,10 @@
+{
+  "stun_host": "stun.l.google.com",
+  "peer_ip": "74.125.250.129",
+  "peer_port": 19302,
+  "client_public_ip": "51.8.146.149",
+  "client_public_port": 46912,
+  "client_local_port": 45679,
+  "run_id": "46131687542",
+  "claim": "Exact endpoint-dependent mapping learned from a reply to this same still-open UDP socket."
+}
