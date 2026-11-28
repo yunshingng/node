@@ -1,0 +1,73 @@
+name: Controlled off-path UDP delivery proof (single packet)
+on:
+  push:
+    branches:
+      - security-research/msquic-v2-retry-e2e
+    paths:
+      - "security-research/msquic-v2-retry-null-deref/offpath-stun-*.py"
+      - "security-research/msquic-v2-retry-null-deref/nettest-coord.py"
+      - ".github/workflows/msquic-offpath-stun-delivery.yml"
+permissions:
+  contents: write
+env:
+  COORD_BRANCH: security-research/msquic-offpath-nettest-coordination
+jobs:
+  target:
+    name: Controlled UDP target (runner A)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Checkout test scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            security-research/msquic-v2-retry-null-deref
+          sparse-checkout-cone-mode: true
+      - name: Install packet capture
+        run: sudo apt-get update && sudo apt-get install -y tcpdump
+      - name: Capture inbound packets to the controlled UDP socket
+        run: sudo tcpdump -U -ni any "udp and dst port 45679" -w target-inbound.pcap >/tmp/target-tcpdump.log 2>&1 &
+      - name: Bind one UDP socket, obtain exact STUN mapping, and wait for one packet
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          LOCAL_PORT: "45679"
+        run: python3 security-research/msquic-v2-retry-null-deref/offpath-stun-target.py
+      - name: Upload target evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offpath-stun-target-evidence
+          path: offpath-stun-results/
+          if-no-files-found: warn
+  attacker:
+    name: Independent off-path sender (runner B)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    needs: []
+    steps:
+      - name: Checkout test scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            security-research/msquic-v2-retry-null-deref
+          sparse-checkout-cone-mode: true
+      - name: Install packet capture
+        run: sudo apt-get update && sudo apt-get install -y tcpdump
+      - name: Wait for target mapping and send exactly one forged-source datagram
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 security-research/msquic-v2-retry-null-deref/nettest-coord.py wait exact-stun-mapping offpath-stun-results/mapping.json 240
+          sudo tcpdump -U -ni any "udp and dst host $(python3 -c \"import json;print(json.load(open(\x27offpath-stun-results/mapping.json\x27))[\x27client_public_ip\x27])\")" -w offpath-stun-results/attacker-egress.pcap >/tmp/attacker-tcpdump.log 2>&1 &
+          sleep 1
+          sudo python3 security-research/msquic-v2-retry-null-deref/offpath-stun-attacker.py
+          sleep 1
+      - name: Upload sender evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offpath-stun-attacker-evidence
+          path: offpath-stun-results/
+          if-no-files-found: warn
