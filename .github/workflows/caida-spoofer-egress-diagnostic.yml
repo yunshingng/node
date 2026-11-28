@@ -25,18 +25,20 @@ jobs:
           sudo apt-get update
           apt-cache policy spoofer
           sudo apt-get install -y spoofer
-      - name: Record Spoofer CLI and package contents
+      - name: Run CAIDA IPv4 source-validation probes
         run: |
-          dpkg -L spoofer
-          command -v spoofer-prober
-          spoofer-prober --help 2>&1 | tee spoofer-help.txt || true
-          spoofer-prober --version 2>&1 | tee spoofer-version.txt || true
+          set -o pipefail
+          echo "PUBLIC_IP=$(curl -4 -fsS https://api.ipify.org)"
+          sudo timeout 180s spoofer-prober -4 -1 -v -s0 -r0 2>&1 | tee spoofer-run.log
+      - name: Record Spoofer version
+        if: always()
+        run: spoofer-prober --version 2>&1 | tee spoofer-version.txt || true
       - name: Upload diagnostic
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: caida-spoofer-egress-diagnostic
           path: |
-            spoofer-help.txt
+            spoofer-run.log
             spoofer-version.txt
           if-no-files-found: warn
