@@ -6,6 +6,7 @@ on:
     paths:
       - "security-research/msquic-v2-retry-null-deref/offpath-stun-*.py"
       - "security-research/msquic-v2-retry-null-deref/nettest-coord.py"
+      - "security-research/msquic-v2-retry-null-deref/offpath-stun-attacker-macos.py"
       - ".github/workflows/msquic-offpath-stun-delivery.yml"
 permissions:
   contents: write
@@ -15,7 +16,7 @@ jobs:
   target:
     name: Controlled UDP target (runner A)
     runs-on: ubuntu-24.04
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
       - name: Checkout test scripts
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -70,5 +71,32 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: offpath-stun-attacker-evidence
+          path: offpath-stun-results/
+          if-no-files-found: warn
+
+  attacker-macos:
+    name: Independent macOS off-path sender (runner C)
+    runs-on: macos-15-intel
+    timeout-minutes: 6
+    steps:
+      - name: Checkout test scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            security-research/msquic-v2-retry-null-deref
+          sparse-checkout-cone-mode: true
+      - name: Wait for exact target mapping and send one forged-source datagram
+        env:
+          GITHUB_TOKEN: \${{ github.token }}
+        run: |
+          mkdir -p offpath-stun-results
+          python3 security-research/msquic-v2-retry-null-deref/nettest-coord.py wait exact-stun-mapping offpath-stun-results/mapping.json 240
+          sudo python3 security-research/msquic-v2-retry-null-deref/offpath-stun-attacker-macos.py
+      - name: Upload sender evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offpath-stun-macos-attacker-evidence
           path: offpath-stun-results/
           if-no-files-found: warn
