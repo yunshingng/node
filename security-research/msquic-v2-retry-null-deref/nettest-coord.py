@@ -42,6 +42,7 @@ def wait_file(name, output, timeout=300):
             with request(url) as r:
                 item = json.loads(r.read())
             data = base64.b64decode(item["content"])
+            pathlib.Path(output).parent.mkdir(parents=True, exist_ok=True)
             pathlib.Path(output).write_bytes(data)
             print(f"RECEIVED={path} bytes={len(data)}", flush=True)
             return
