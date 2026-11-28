@@ -75,9 +75,9 @@ jobs:
           if-no-files-found: warn
 
   attacker-macos:
-    name: Independent macOS off-path sender (runner C)
+    name: Independent macOS off-path sender (CAIDA L2-capable network)
     runs-on: macos-15-intel
-    timeout-minutes: 6
+    timeout-minutes: 8
     steps:
       - name: Checkout test scripts
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -86,15 +86,16 @@ jobs:
           sparse-checkout: |
             security-research/msquic-v2-retry-null-deref
           sparse-checkout-cone-mode: true
-      - name: Wait for exact target mapping and send one forged-source datagram
+      - name: Install Scapy for L2 packet injection
+        run: python3 -m pip install --user scapy
+      - name: Wait for exact target mapping and send one forged-source L2 datagram
         env:
-          GITHUB_TOKEN: \${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           mkdir -p offpath-stun-results
           python3 security-research/msquic-v2-retry-null-deref/nettest-coord.py wait exact-stun-mapping offpath-stun-results/mapping.json 240
           sudo python3 security-research/msquic-v2-retry-null-deref/offpath-stun-attacker-macos.py
-
-      - name: Upload sender evidence
+      - name: Upload macOS sender evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
