@@ -1,0 +1,32 @@
+name: Cloudflare QUIC peer STUN mapping check
+on:
+  push:
+    branches:
+      - security-research/msquic-v2-retry-e2e
+    paths:
+      - "security-research/msquic-v2-retry-null-deref/cloudflare-peer-stun-test.py"
+      - ".github/workflows/cloudflare-peer-stun-mapping.yml"
+permissions:
+  contents: read
+jobs:
+  mapping:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Checkout diagnostic
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            security-research/msquic-v2-retry-null-deref
+          sparse-checkout-cone-mode: true
+      - name: Probe documented Cloudflare TURN UDP/443 against QUIC peer address
+        run: |
+          python3 security-research/msquic-v2-retry-null-deref/cloudflare-peer-stun-test.py | tee cloudflare-peer-stun-results.json
+      - name: Upload mapping comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudflare-peer-stun-mapping
+          path: cloudflare-peer-stun-results.json
+          if-no-files-found: warn
