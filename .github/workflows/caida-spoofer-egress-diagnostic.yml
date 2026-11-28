@@ -10,7 +10,7 @@ permissions:
 jobs:
   ubuntu:
     runs-on: ubuntu-24.04
-    timeout-minutes: 8
+    timeout-minutes: 12
     steps:
       - name: Record network identity
         run: |
@@ -29,7 +29,7 @@ jobs:
         run: |
           set -o pipefail
           echo "PUBLIC_IP=$(curl -4 -fsS https://api.ipify.org)"
-          sudo timeout -k 5s 180s spoofer-prober -4 -1 -v -s0 -r0 2>&1 | tee spoofer-run.log
+          sudo timeout -k 5s 300s spoofer-prober -4 -1 -v -s0 -r0 2>&1 | tee spoofer-run.log
       - name: Record Spoofer version
         if: always()
         run: spoofer-prober --version 2>&1 | tee spoofer-version.txt || true
@@ -66,7 +66,7 @@ jobs:
             exit 1
           fi
           echo "PROBER=$PROBER"
-          sudo python3 -c 'import subprocess,sys; r=subprocess.run(sys.argv[1:], timeout=180); sys.exit(r.returncode)' "$PROBER" -4 -1 -v -s0 -r0 2>&1 | tee spoofer-run-macos.log
+          sudo python3 -c 'import subprocess,sys; r=subprocess.run(sys.argv[1:], timeout=300); sys.exit(r.returncode)' "$PROBER" -4 -1 -v -s0 -r0 2>&1 | tee spoofer-run-macos.log
       - name: Upload macOS diagnostic
         if: always()
         uses: actions/upload-artifact@v4
